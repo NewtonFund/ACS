@@ -1,0 +1,7 @@
+#!/bin/bash
+CPATH=/usr/local/include:/usr/local/include/plibsys
+LD_LIBRARY_PATH=/usr/local/lib
+export CPATH
+export LD_LIBRARY_PATH
+
+cc -o acs main.c acs_log.c acs_cfg.c -lplibsys

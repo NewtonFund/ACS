@@ -1,0 +1,8 @@
+#!/bin/bash
+CPATH=/usr/local/include:/usr/local/include/plibsys
+LD_LIBRARY_PATH=/usr/local/lib
+export CPATH
+export LD_LIBRARY_PATH
+
+cc -o server net_server.c
+cc -o client net_client.c 

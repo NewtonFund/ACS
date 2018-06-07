@@ -1,0 +1,14 @@
+Astrometry Conversion Service - ACS
+
+Source files follow this naming convention: 
+  acs_<facility>_<function group>.[ch]
+
+Facilities
+cfg 
+log
+cvt
+net
+cmd
+
+acsbuild - build script
+
