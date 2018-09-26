@@ -1,104 +1,132 @@
 /*! ACS main function
  *
  */
-
 #define ACS_MAIN 
 #include "acs.h"
-#include "acs_dat.h"
 
 /*
- * Initialise global variables
+ * Command server process main loop (slow) 
 */
-int acs_ini_mem(void)
+int acs_cmd( void )
 {
-    PError *error; 
-
-    acs_dbg_lvl = 0;
-    const PShm *shm;
-   
-   if (( shm     = p_shm_new( ACS_TXT_MEM, sizeof( acs_mem_t ), P_SHM_ACCESS_READWRITE, &error ))&&
-       ( acs_mem = p_shm_get_address( shm )                                                     )  ) 
-    {
-        memset( acs_mem, 0, sizeof( acs_mem_t ) );
-        return ACS_SUCCESS;
-    }
-    else
-    {
-        acs_log_msg( ACS_PFX_SYS, ACS_FAC_ACS, "p_shm_new() Failed, acs_mem=%p", acs_mem ); 
-        return ACS_FAILURE;
-    }
-}
-
-/*
- * Command process main loop 
-*/
-int acs_cmd(void)
-{
-    unsigned char buf[1024];
+    unsigned char pkt[1024];
     long int len;
-    
-    acs_ini_mem();
+
+    acs_ini_mkmem();
     acs_ini_read();
     acs_ini_data();
-    acs_net_open( acs_IPType, acs_IPAddress, acs_IPPort );
+    acs_net_cmd_ini( &acs_net_cmd );
+    acs_debug( DBG3, "isserver=%i", acs_net_cmd.isserver );
+
+    acs_mem->Ready = true;
+
+    acs_log_msg( true, ACS_PFX_INF, ACS_FAC_ACS, "cmd process starting, pid=%i", acs_cmdpid );
     for(;;)
     {
-        acs_net_read( buf, sizeof(buf), &len);
+        len = acs_net_cmd_rcv( &acs_net_cmd, pkt, sizeof(pkt));
+        printf("%li", len);
+        if ( len > 0 )
+        {
+            printf( "LEN: %li\n", len );
+            acs_jsn_parse( pkt ); 
+            puts("Done");
+        }
         sleep(1);
-        puts(".");
     }
 }
 
 
 /*
- * Demand process main loop 
+ * Demand client process main loop (fast) 
 */
-int acs_dmd()
+int acs_dmd( void )
 {
-    acs_debug( DBG3, "Dmd: cmdpid=%i, dmdpid=%i", acs_cmdpid, acs_dmdpid ); 
-    acs_ini_mem();
+//    unsigned char buf[]="COMMAND";
+    acs_pkt_t *dmd_ptr;
+    long int dmd_len;
+    long int snd_len;
+
+    struct timespec nxt; // Next time to send a packet
+    struct timespec now; // The time now 
+
+    acs_ini_mkmem();
+    acs_ini_read();
+    acs_ini_data();
+
+//  Create a demand packet template
+    dmd_len = acs_jsn_mkdmd( &dmd_ptr );
+
+//  Initialise the network interface
+    acs_net_dmd_ini( &acs_net_dmd );
+
+    printf( "LEN: %li %s\n", dmd_len, dmd_ptr->jsn ); // DEBUG
+  
+//  Evaluate the time for the next demand
+    clock_gettime( CLOCK_REALTIME, &nxt ); 
+    nxt = utl_ts_add( &nxt, &acs_mem->DemandInterval );
+
+    acs_log_msg( true, ACS_PFX_INF, ACS_FAC_ACS, "dmd process starting, pid=%i", acs_dmdpid );
     for(;;)
     {
-        if ( acs_mem->Ready )
-        {
-            acs_ast_calc();
-        }
+        puts(".");
+//DEBUG:        if ( acs_mem->Ready )
+//        {
+            acs_ast_calc( &nxt );
+            dmd_len = acs_jsn_wrdmd( dmd_ptr );
+
+//          Wait for send time to come around
+            do
+            {
+                clock_gettime( CLOCK_REALTIME, &now ); 
+            }
+            while ( ( now.tv_sec  < nxt.tv_sec )&&
+                    ( now.tv_nsec < nxt.tv_nsec)  ); 
+
+           
+            snd_len = acs_net_dmd_snd( &acs_net_dmd, (unsigned char *)dmd_ptr, dmd_len );
+            puts(dmd_ptr->jsn);
+//            len = acs_net_cli_snd( &acs_net_dmd, buf, sizeof(buf) );
+//           nanoleep();
+            sleep(1);
+//        }
     }
     return ACS_SUCCESS;
 }
 
 
 /*
- * Common main loop
+** Common main loop
 */
 int main( int argc, char *argv[] )
 {
     p_libsys_init();
-    pid_t pid;
+    pid_t pid  = getpid();
 
     acs_dbg_lvl = DBG_LVL;
 
-/*  Create sub-process */
-    pid = fork();
+//  Create sub-process xx*/
+//DEBUG:    pid = fork();
     if ( pid > 0 )
     {
-/*      We are the command process */
+//      We are the command process
         acs_cmdpid = getpid();
         acs_dmdpid = pid;
-        return acs_cmd();       
+        return acs_log_msg( acs_cmd(), ACS_PFX_SYS, ACS_FAC_ACS, "dmd process exiting" );
     }
-    else if ( pid == 0)
+    else if ( !pid )
     {
-/*      We are the demand sub-process */
+//      We are the demand sub-process
         acs_dmdpid = getpid();
         acs_cmdpid = getppid();
-        return acs_dmd();       
+        return acs_log_msg( acs_dmd(), ACS_PFX_SYS, ACS_FAC_ACS, "cmd process exiting" );
     }
     else
     {
-        acs_log_msg( ACS_PFX_SYS, ACS_FAC_ACS, "fork() failed, errno=%i", errno ); 
+//      FATAL: Failed to create sub-process
         perror( ACS_PERROR );
+        return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_ACS, "fork() failed, errno=%i", errno ); 
     }
 
+//  This proces should never return 
     return EXIT_FAILURE;
 }

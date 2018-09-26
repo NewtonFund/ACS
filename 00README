@@ -3,12 +3,19 @@ Astrometry Conversion Service - ACS
 Source files follow this naming convention: 
   acs_<facility>_<function group>.[ch]
 
+main() function is in acs.c 
+
 Facilities
-cfg 
-log
-cvt
-net
-cmd
+ini - configuration  
+log - event/syslog messages
+ast - astrometric conversion
+net - network handler
+jsn - json unpack/packer interface
+cmd - command handler
+chk - command checker
+mem - common memory block handler
+utl - utility functions
+dat - global data block
 
 acsbuild - build script
-
+???build - test/harness build scriptsi, eg pktbuild

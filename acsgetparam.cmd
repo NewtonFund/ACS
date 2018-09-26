@@ -1,0 +1,2 @@
+{"CommandName": "ACSGetParam",
+"ACSParam": "TrackFreq"} 

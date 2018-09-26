@@ -4,4 +4,4 @@ LD_LIBRARY_PATH=/usr/local/lib
 export CPATH
 export LD_LIBRARY_PATH
 
-cc -o acs acs.c acs_log.c acs_ini.c acs_net.c acs_ast.c acs_jsn.c acs_chk.c acs_cmd.c acs_utl.c -lplibsys -lsofa_c -lm
+cc -o txcmd txcmd.c  -lplibsys 

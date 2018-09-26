@@ -1,79 +1,161 @@
-/* Global data storage
+/*
+ * Global data storage
+ * acs_ prefix are working values used by the astrometric engine sub-process
+ * str_ prefix indicates stored strings that are converted to a pseudo-enumeration (Enum) 
  *
+ */
+
+
+// System global data declared as EXTERN for all other modules
+EXTERN int        acs_dbg_lvl             ;  // Debug level
+EXTERN pid_t      acs_cmdpid              ;  // Command process PID
+EXTERN pid_t      acs_dmdpid              ;  // nemand  process PID
+EXTERN acs_mem_t *acs_mem                 ;  // Share memory between processes
+EXTERN acs_net_t  acs_net_dmd;            ; 
+EXTERN acs_net_t  acs_net_cmd;            ; 
+
+/*
+** 
+** Global data within a process shared between all compilation modules
+** Values are modified in this order:
+**    0 - Default values set when data is declared 
+**    1 - Configuration values from .ini file 
+**    2 - Incoming command message
+**    3 - Internal process updates/changes 
 */
-#ifdef ACS_MAIN 
-#define EXTERN 
-#else
-#define EXTERN extern
-#endif
+EXTERN char   str_Lat[STR_MAX]            ;
+EXTERN char   str_Lon[STR_MAX]            ;
+EXTERN double acs_Alt                     ;
 
-EXTERN int acs_dbg_lvl;
-EXTERN pid_t acs_cmdpid;
-EXTERN pid_t acs_dmdpid;
-EXTERN acs_mem_t *acs_mem;
+EXTERN char   str_Protocol[STR_MAX]       ;
+EXTERN enum   PSocketProtocol_ acs_sktProtocol;
+EXTERN char   str_AddrPort[STR_MAX]       ;
+EXTERN char   acs_Addr[STR_MAX]           ;
+EXTERN int    acs_Port                    ;
+                                          
+EXTERN char   acs_Dir[DIR_MAX]            ;
 
-// Configuratin data read from .ini file
-EXTERN char   acs_Latitude[32]   ; // String 
-EXTERN char   acs_Longitude[32]  ; // String 
-EXTERN double acs_Altitude       ; // Decimal
+EXTERN double acs_LimitZDHi               ;
+EXTERN double acs_LimitZDlo               ;
+EXTERN double acs_LimitAzmHi              ;
+EXTERN double acs_LimitAzmLo              ;
+EXTERN double acs_LimitRotHi              ;
+EXTERN double acs_LimitRotLo              ;
 
-EXTERN char   acs_IPType[99]     ; // String 
-EXTERN char   acs_IPAddress[16]  ; // String 
-EXTERN int    acs_IPPort         ; // Port
+EXTERN double acs_MaxErrZD                ;
+EXTERN double acs_MaxErrAzm               ;
+EXTERN double acs_MaxErrRot               ;
 
-EXTERN char   acs_Dir            ; // String 
+// -ve timeout = infinite                 
+EXTERN double acs_TimeoutSlew             ; 
+EXTERN double acs_TimeoutAG               ;
+EXTERN double acs_TimeoutMet              ;
+EXTERN double acs_TimeoutAxis             ;
+EXTERN double acs_TimeoutReply            ; 
+EXTERN double acs_TimeoutAge              ;
 
-EXTERN double acs_LimitDecHi     ; // Decimal
-EXTERN double acs_LimitDecLo     ; // Decimal
-EXTERN double acs_LimitZDHi      ; // Decimal
-EXTERN double acs_LimitZDlo      ; // Decimal
-EXTERN double acs_LimitAzmHi     ; // Decimal
-EXTERN double acs_LimitAzmLo     ; // Decimal
-EXTERN double acs_LimitRotHi     ; // Decimal
-EXTERN double acs_LimitRotLo     ; // Decimal
+EXTERN double acs_LeapSecs                ;
+EXTERN double acs_DUTC                    ;
+EXTERN double acs_PolarX                  ;
+EXTERN double acs_PolarY                  ;
 
-EXTERN double acs_MaxErrZD       ; // Decimal
-EXTERN double acs_MaxErrAzm      ; // Decimal
-EXTERN double acs_MaxErrRot      ; // Decimal
+EXTERN char   str_CommandAddrPort[STR_MAX];
+EXTERN char   acs_CommandAddr[STR_MAX]    ;
+EXTERN int    acs_CommandPort             ;
+EXTERN char   str_DemandAddrPort[STR_MAX] ;
+EXTERN char   acs_DemandAddr[STR_MAX]     ;
+EXTERN int    acs_DemandPort              ;
+EXTERN int    acs_DemandFreq              ;
+EXTERN struct timespec acs_DemandInterval ; // Time between demands 
+EXTERN struct timespec acs_DemandLatency  ; // Time to evaluate a demand 
 
-EXTERN double acs_TimeoutSlew    ; // Decimal
-EXTERN double acs_TimeoutAG      ; // Decimal
-EXTERN double acs_TimeoutMet     ; // Decimal
-EXTERN double acs_TimeoutAxis    ; // Decimal
-EXTERN double acs_TimeoutReply   ; // Decimal
-EXTERN double acs_TimeoutMessage ; // Decimal
+EXTERN char   str_AGAddrPort[STR_MAX]     ;
+EXTERN char   acs_AGAddr[STR_MAX]         ;
+EXTERN int    acs_AGPort                  ;
+EXTERN char   str_AGFrame[STR_MAX]        ;
+EXTERN int    acs_AGFrame                 ;
+EXTERN char   str_AGType[STR_MAX]         ;
+EXTERN int    acs_AGType                  ;
+EXTERN bool   acs_AGRotates               ;
+EXTERN double acs_AGX                     ;
+EXTERN double acs_AGY                     ;
+EXTERN double acs_AGRotAngle              ;
+EXTERN double acs_AGWavelength            ;
+EXTERN char   str_AGSmoothing[STR_MAX]    ;
+EXTERN int    acs_AGSmoothing             ;
+EXTERN int    acs_AGSampleSize            ;
 
-EXTERN double acs_LeapSecs       ; // Decimal
-EXTERN double acs_DUTC           ; // Decimal
-EXTERN double acs_PolarX         ; // Decimal
-EXTERN double acs_PolarY         ; // Decimal
+EXTERN char   str_MetAddrPort[STR_MAX]    ;
+EXTERN char   acs_MetAddr[STR_MAX]        ;
+EXTERN int    acs_MetPort                 ;
+EXTERN double acs_MetPress                ;
+EXTERN double acs_MetTemp                 ;
+EXTERN double acs_MetRH                   ;
+EXTERN double acs_MetWavelength           ;
+EXTERN char   str_MetSmoothing[STR_MAX]   ;  
+EXTERN int    acs_MetSmoothing            ;
+EXTERN int    acs_MetSampleSize           ;
 
-EXTERN char   acs_MessageIPAddress[16]  ; // String 
-EXTERN int    acs_MessageIPPort  ; // String 
-EXTERN char   acs_DemandIPAddress[16]   ; // String 
-EXTERN int    acs_DemandIPPort   ; // String 
-EXTERN int    acs_DemandFreq     ; // Integer
+EXTERN char   acs_InstName[STR_MAX]       ;       
+EXTERN double acs_InstRotAngle            ;
+EXTERN double acs_InstWavelength          ;
+EXTERN bool   acs_InstRotates             ;
 
-EXTERN char    acs_AGIPAddress[16]; // String 
-EXTERN int     acs_AGIPPort      ; // Integer 
-EXTERN char    acs_AGFrame[99]   ; // String 
-EXTERN char    acs_AGType[99]    ; // String 
-EXTERN double  acs_AGRotAngle    ; // Decimal
-EXTERN double  acs_AGWavelength  ; // Decimal
+EXTERN int    acs_TrackEquinox            ;
+EXTERN acs_time_t acs_TrackEpoch          ; 
+EXTERN double acs_TrackRA                 ;
+EXTERN double acs_TrackDec                ;
+EXTERN double acs_TrackPMRA               ;
+EXTERN double acs_TrackPMDec              ;
+EXTERN double acs_TrackParallax           ;
+EXTERN double acs_TrackRadVel             ;
+EXTERN char   str_TrackRotFrame[STR_MAX]  ;
+EXTERN int    acs_TrackRotFrame           ;
+EXTERN double acs_TrackRotAngle           ;
+EXTERN double acs_TrackFreq               ;
+EXTERN acs_time_t acs_TrackStart          ;
+EXTERN double acs_TrackDuration           ;
 
-EXTERN char    acs_AGSmoothing[99]; // String 
-EXTERN int     acs_AGSampleSize   ; // Integer
+EXTERN bool   acs_EnableAG                ;
+EXTERN bool   acs_EnableMet               ;
+EXTERN bool   acs_EnableCorr              ;
+EXTERN bool   acs_EnableOffset            ;
+EXTERN bool   acs_EnablePMRA              ;
+EXTERN bool   acs_EnablePMDec             ;
+EXTERN bool   acs_EnableZD                ;
+EXTERN bool   acs_EnableAzm               ;
+EXTERN bool   acs_EnableRot               ;
 
-EXTERN char    acs_MetIPAddress[16]; // String 
-EXTERN int     acs_MetIPPort     ; // Integer 
-EXTERN double  acs_MetPress      ; // Decimal
-EXTERN double  acs_MetTemp       ; // Decimal
-EXTERN double  acs_MetRH         ; // Decimal
-EXTERN double  acs_Wavelength    ; // Decimal
-EXTERN char    acs_Smoothing     ; // String 
-EXTERN int     acs_SampleSize    ; // Integer
+EXTERN char   str_CorrType[STR_MAX]       ;
+EXTERN int    acs_CorrType                ;
+EXTERN char   str_CorrFrame[STR_MAX]      ;
+EXTERN int    acs_CorrFrame               ;
+EXTERN double acs_CorrX                   ;
+EXTERN double acs_CorrY                   ;
+EXTERN double acs_CorrRotAngle            ;
 
-EXTERN char     acs_InstName[99]  ; // String 
-EXTERN double   acs_InstRotAngle  ; // Decimal
-EXTERN double   acs_Wavelength    ; // Decima
+EXTERN char   str_OffsetType[STR_MAX]     ;
+EXTERN int    acs_OffsetType              ;
+EXTERN char   str_OffsetFrame[STR_MAX]    ;
+EXTERN int    acs_OffsetFrame             ;
+EXTERN double acs_OffsetX                 ;
+EXTERN double acs_OffsetY                 ;
+EXTERN double acs_OffsetRotAngle          ;
 
+EXTERN int    acs_AxisState               ;
+EXTERN double acs_AxisZD                  ;
+EXTERN double acs_AxisAzm                 ;
+EXTERN double acs_AxisRotAngle            ;
+
+EXTERN char   acs_LogFile[STR_MAX]        ;
+EXTERN char   str_LogAddrPort[STR_MAX]    ;
+EXTERN char   acs_LogAddr[STR_MAX]        ;
+EXTERN int    acs_LogPort                 ;
+EXTERN double acs_LogFreq                 ;
+EXTERN struct tm acs_LogInterval          ; // Time between logging 
+EXTERN char   str_LogAction[STR_MAX]      ;
+EXTERN int    acs_LogAction               ;
+
+EXTERN char   str_ACSNewState[STR_MAX]    ;
+EXTERN int    acs_ACSNewState             ;
+EXTERN char   acs_ACSReason[STR_MAX]      ;

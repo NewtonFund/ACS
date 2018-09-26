@@ -4,29 +4,61 @@
 
 #include "acs.h"
 
-FILE *fp;
 
-int acs_log_txt( char *pfx, char *fac, char *txt )
+/* Look-up tables to convert numeric to string */ 
+char *log_pfx[] = { ACS_PFX_INF_TXT,
+                    ACS_PFX_WRN_TXT,
+                    ACS_PFX_ERR_TXT,
+                    ACS_PFX_LIB_TXT,
+                    ACS_PFX_SYS_TXT };
+ 
+
+char *log_fac[] = { ACS_FAC_ACS_TXT,
+                    ACS_FAC_CFG_TXT,
+                    ACS_FAC_NET_TXT,
+                    ACS_FAC_LOG_TXT,
+                    ACS_FAC_MEM_TXT,
+                    ACS_FAC_JSN_TXT,
+                    ACS_FAC_CHK_TXT };
+
+/*
+ * Writes a message to the log file and return a provided value
+ * The ret value is for coding convenience to allow single lines 
+ */
+int acs_log_msg( int ret, int pfx, int fac,  char* fmt, ...)
 {
-   fp = fopen(ACS_LOG_FILE, "a");
-   fprintf(fp, "%s_%s_%s\n", pfx, fac, txt ); 
-   fclose( fp );
+    va_list args;
+    FILE   *fp;
+    time_t  tnow;
+    char    tstamp[80];   
 
-#ifdef DEBUG 
-   fprintf(stderr, "%s_%s_%s\n", pfx, fac, txt ); 
-#endif
+    if ( fp = fopen(ACS_LOG_FILE, "a") )
+    {
+        time( &tnow );
+        strftime( tstamp, sizeof( tstamp ) - 1, ACS_TSTAMP_FMT, localtime( &tnow) );
 
-   return ACS_SUCCESS;
+        va_start( args, fmt );
+        fprintf( fp, "%s %s_%s: ", tstamp, log_pfx[pfx], log_fac[fac] );
+        vfprintf( fp, fmt, args );
+        fputs( "\n", fp );
+        va_end( args );
+        fclose( fp );
+    }
+    else
+    {
+        perror(ACS_PERROR);
+    }
+
+    return ret;
 }
 
 
 /*!
- * Ordered shutdown of log file
+ * Ordered shutdown of ACS process 
 */
-int acs_log_shutdown( void )
+int acs_close( void )
 {
-   acs_log_txt( ACS_PFX_INF, ACS_FAC_LOG, "Shutting down" );
    p_libsys_shutdown();
 
-   return ACS_SUCCESS;
+   return acs_log_msg( ACS_SUCCESS, ACS_PFX_INF, ACS_FAC_LOG, "Shutting down" );
 }
