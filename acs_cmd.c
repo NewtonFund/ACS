@@ -26,49 +26,150 @@ int acs_cmd_TrackInit  (void)
     acs_mem->EnableOffset  = acs_EnableOffset; 
     acs_mem->EnableAG      = acs_EnableAG; 
 
-//  
+//  Convert input RA & DEC to radians
     acs_mem->ReqRadRA      = acs_TrackRA  * D2PI / 24.0;     
     acs_mem->ReqRadDec     = acs_TrackDec * DAS2R;     
+
+    acs_mem->Ready = true;    
 
     return true;
 }
 
 int acs_cmd_TrackCorr  (void)
 {
-    acs_mem->CorrType     = acs_CorrType; 
-    acs_mem->CorrFrame    = acs_CorrFrame; 
-    acs_mem->CorrX        = acs_CorrX; 
-    acs_mem->CorrY        = acs_CorrY; 
-    acs_mem->CorrRotAngle = acs_CorrRotAngle; 
+    if      ( ( acs_CorrFrame == ACS_FRAME_MOUNT )&&
+              ( acs_CorrType  == ACS_TYPE_FIXED  )  )
+    {
+        acs_mem->CorrX    = acs_CorrX   * MAS2DEG;
+        acs_mem->CorrY    = acs_CorrY   * MAS2DEG;
+        acs_mem->CorrRot  = acs_CorrRot * MAS2DEG;
+    }
+    else if ( ( acs_CorrFrame == ACS_FRAME_MOUNT )&&
+              ( acs_CorrType  == ACS_TYPE_CUMUL  )  )
+    {
+        acs_mem->CorrX   += acs_CorrX   * MAS2DEG;
+        acs_mem->CorrY   += acs_CorrY   * MAS2DEG;
+        acs_mem->CorrRot      += acs_CorrRot * MAS2DEG;
+
+//      Reset globals if cumulative to avoid incrementing each time  
+        acs_CorrX = acs_CorrY = acs_CorrRot = 0.0;
+    }
+    else if ( ( acs_CorrFrame == ACS_FRAME_CELEST)&&
+              ( acs_CorrType  == ACS_TYPE_FIXED  )  )
+    {
+        acs_mem->CorrX   = acs_CorrX * MAS2RAD;
+        acs_mem->CorrY   = acs_CorrY * MAS2RAD;
+    }
+    else if ( ( acs_CorrFrame == ACS_FRAME_CELEST)&&
+              ( acs_CorrType  == ACS_TYPE_CUMUL  )  )
+    {
+        acs_mem->CorrX  += acs_CorrX  * MAS2RAD;
+        acs_mem->CorrY  += acs_CorrY  * MAS2RAD;
+
+//      Reset globals if cumulative to avoid incrementing each time  
+        acs_CorrX = acs_CorrY = 0.0;
+    }
+    else if ( ( acs_CorrFrame == ACS_FRAME_INST )&&
+              ( acs_CorrType  == ACS_TYPE_FIXED )  )
+    {
+        acs_mem->CorrX    = acs_CorrX  * MAS2DEG;
+        acs_mem->CorrY    = acs_CorrY  * MAS2DEG;
+    }
+    else if ( ( acs_CorrFrame == ACS_FRAME_INST )&&
+              ( acs_CorrType  == ACS_TYPE_CUMUL  )  )
+    {
+        acs_mem->CorrX   += acs_CorrX  * MAS2DEG;
+        acs_mem->CorrY   += acs_CorrY  * MAS2DEG;
+
+//      Reset globals if cumulative to avoid incrementing each time  
+        acs_CorrX = acs_CorrY = 0.0;
+    }
+    else 
+    {
+        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_CHK, "Unrecognised correction" );
+    }
+
     return true;
 }
 
 int acs_cmd_TrackOffset(void)
 {
-    acs_mem->OffsetType     = acs_OffsetType; 
-    acs_mem->OffsetFrame    = acs_OffsetFrame; 
-    acs_mem->OffsetX        = acs_OffsetX; 
-    acs_mem->OffsetY        = acs_OffsetY; 
-    acs_mem->OffsetRotAngle = acs_OffsetRotAngle; 
-    return true;
+    acs_mem->OffsetFrame = acs_OffsetFrame;
+    acs_mem->OffsetType  = acs_OffsetType;
+
+    if      ( ( acs_OffsetFrame == ACS_FRAME_MOUNT )&&
+              ( acs_OffsetType  == ACS_TYPE_FIXED  )  )
+    {
+        acs_mem->OffsetX    = acs_OffsetX   * MAS2DEG; 
+        acs_mem->OffsetY    = acs_OffsetY   * MAS2DEG; 
+        acs_mem->OffsetRot  = acs_OffsetRot * MAS2DEG; 
+    }
+    else if ( ( acs_OffsetFrame == ACS_FRAME_MOUNT )&&
+              ( acs_OffsetType  == ACS_TYPE_CUMUL  )  )
+    {
+        acs_mem->OffsetX   += acs_OffsetX   * MAS2DEG; 
+        acs_mem->OffsetY   += acs_OffsetY   * MAS2DEG; 
+        acs_mem->OffsetRot += acs_OffsetRot * MAS2DEG; 
+
+//      Reset globals if cumulative to avoid incrementing each time  
+        acs_OffsetX = acs_OffsetY = acs_OffsetRot = 0.0;
+    }
+    else if ( ( acs_OffsetFrame == ACS_FRAME_CELEST)&&
+              ( acs_OffsetType  == ACS_TYPE_FIXED  )  )
+    {
+        acs_mem->OffsetX   = acs_OffsetX * MAS2RAD; 
+        acs_mem->OffsetY   = acs_OffsetY * MAS2RAD; 
+    }
+    else if ( ( acs_OffsetFrame == ACS_FRAME_CELEST)&&
+              ( acs_OffsetType  == ACS_TYPE_CUMUL  )  )
+    {
+        acs_mem->OffsetX  += acs_OffsetX  * MAS2RAD; 
+        acs_mem->OffsetY  += acs_OffsetY  * MAS2RAD; 
+
+//      Reset globals if cumulative to avoid incrementing each time  
+        acs_OffsetX = acs_OffsetY = 0.0;
+    }
+    else if ( ( acs_OffsetFrame == ACS_FRAME_INST )&&
+              ( acs_OffsetType  == ACS_TYPE_FIXED )  )
+    {
+        acs_mem->OffsetX     = acs_OffsetX  * MAS2DEG; 
+        acs_mem->OffsetY     = acs_OffsetY  * MAS2DEG; 
+    }
+    else if ( ( acs_OffsetFrame == ACS_FRAME_INST )&&
+              ( acs_OffsetType  == ACS_TYPE_CUMUL )  )
+    {
+        acs_mem->OffsetX    += acs_OffsetX  * MAS2DEG; 
+        acs_mem->OffsetY    += acs_OffsetY  * MAS2DEG; 
+
+//      Reset globals if cumulative to avoid incrementing each time  
+        acs_OffsetX = acs_OffsetY = 0.0;
+    }
+    else 
+    {
+        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_CHK, "Unrecognised Offset: Type=%i Frame=%i", acs_OffsetType, acs_OffsetFrame );
+    }
+
     return true;
 }
 
 int acs_cmd_TrackEnable(void)
 {
+    acs_mem->EnableAzm    = acs_EnableAzm; 
+    acs_mem->EnableZD     = acs_EnableZD; 
+    acs_mem->EnableRot    = acs_EnableRot; 
+
     acs_mem->EnableAG     = acs_EnableAG; 
     acs_mem->EnableMet    = acs_EnableMet; 
     acs_mem->EnableCorr   = acs_EnableCorr; 
+    acs_mem->EnableOffset = acs_EnableOffset; 
     acs_mem->EnablePMRA   = acs_EnablePMRA; 
     acs_mem->EnablePMDec  = acs_EnablePMDec; 
-    acs_mem->EnableZD     = acs_EnableZD; 
-    acs_mem->EnableAzm    = acs_EnableAzm; 
-    acs_mem->EnableRot    = acs_EnableRot; 
     return true;
 }
 
 int acs_cmd_TrackEnd   (void)
 {
+    acs_mem->Ready = false;    
     return true;
 }
 

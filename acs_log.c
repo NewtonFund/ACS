@@ -36,7 +36,6 @@ int acs_log_msg( int ret, int pfx, int fac,  char* fmt, ...)
     {
         time( &tnow );
         strftime( tstamp, sizeof( tstamp ) - 1, ACS_TSTAMP_FMT, localtime( &tnow) );
-
         va_start( args, fmt );
         fprintf( fp, "%s %s_%s: ", tstamp, log_pfx[pfx], log_fac[fac] );
         vfprintf( fp, fmt, args );
@@ -46,7 +45,17 @@ int acs_log_msg( int ret, int pfx, int fac,  char* fmt, ...)
     }
     else
     {
-        perror(ACS_PERROR);
+        perror(ACS_LOG_ERR);
+    }
+
+//  Can't use acs_debug() macro with va_list so do this long hand   
+    if ( acs_dbg_lvl >= DBG3 )
+    {
+        va_start( args, fmt );
+        printf( "DBG: " ); 
+        vprintf( fmt, args ); 
+        puts("");
+        va_end( args );
     }
 
     return ret;

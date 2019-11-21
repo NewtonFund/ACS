@@ -1,12 +1,12 @@
 #include "acs.h"
 
 // Demand packet is stored locally
-static acs_pkt_t      dmd_pkt;                     // Demand packet 
+static acs_pkt_t      dmd_pkt;                    // Demand packet 
 static unsigned char *dmd_jsn_ptr = dmd_pkt.jsn;  // Pointer to start of JSON data 
-static unsigned char *dmd_azm_ptr;                 // Pointer to Azimuth field within JSON data
-static unsigned char *dmd_zd_ptr;                  // Pointer to Zenith Distance field within JSON data
-static unsigned char *dmd_rot_ptr;                 // Pointer to Rotation field within JSON data
-static long int       dmd_len;                     // Total length of a demand packet (packet header + JSON data) 
+static unsigned char *dmd_azm_ptr;                // Pointer to Azimuth field within JSON data
+static unsigned char *dmd_zd_ptr;                 // Pointer to Zenith Distance field within JSON data
+static unsigned char *dmd_rot_ptr;                // Pointer to Rotation field within JSON data
+static long int       dmd_len;                    // Total length of a demand packet (packet header + JSON data) 
 
 /*
 ** Parse a JSON packet
@@ -22,6 +22,8 @@ bool acs_jsn_parse( unsigned char *pkt )
     unsigned char *val_ptr; // Data value
     unsigned char *cmd_ptr; // Command name
     unsigned char *end_ptr; // End of packet data
+    acs_func_t     func;    // Function associated with command
+
     int            ok = false;
     acs_tag_t     *tag_ptr;
 
@@ -46,8 +48,10 @@ bool acs_jsn_parse( unsigned char *pkt )
 //  Extract the associated value
     if ( !(cmd_ptr = strtok( ++sep_ptr, " \"}," )))
         return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "No command tag found in PKT=%s. No action", pkt);
+    acs_debug( DBG2, "RXCMD:%s=%s", nam_ptr, cmd_ptr );
 
-    acs_debug( DBG3, "RXCMD:%s=%s", nam_ptr, cmd_ptr );
+    if ( !( func = utl_cmd2func( cmd_ptr )))
+        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised command=%s. No action", cmd_ptr );
 
 //  Read any following tag name:value pairs
     while( brk_ptr < end_ptr )
@@ -62,11 +66,14 @@ bool acs_jsn_parse( unsigned char *pkt )
             break;
         if (!(val_ptr = strtok( ++sep_ptr, "}, \"")))      // If no value then skip 
             break;
-        acs_debug( DBG3, "  VAL:%s=%s", nam_ptr, val_ptr );// Useful to see what we got
-
+        acs_debug( DBG2, "  VAL:%s=%s", nam_ptr, val_ptr );// Useful to see what we got
+        
         // Search for the tag name in the look-up table 
         if ( !(tag_ptr = bsearch( &nam_ptr, acs_tags, acs_tags_num, acs_tags_siz, acs_tags_cmp )))
+        { 
             acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised TAG=%s. Ignoring", nam_ptr);
+            break;
+        }
 
 //      How to process the value depends on its type
         switch ( tag_ptr->type )
@@ -102,7 +109,7 @@ bool acs_jsn_parse( unsigned char *pkt )
                 else if (strcmp( nam_ptr, ACS_TAG_LOGACTION      )  )
                     ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_action );
                 else
-                    ok =false;
+                    ok = acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised TAG=%s. Ignoring", nam_ptr);
                 break;
 
             case ACS_TYP_TIME:
@@ -113,11 +120,21 @@ bool acs_jsn_parse( unsigned char *pkt )
                 ok = acs_chk_ip( val_ptr, tag_ptr->var, tag_ptr );
                 break;
 
+            case ACS_TYP_BOOL:
+                ok = acs_chk_bool( val_ptr, tag_ptr->var, tag_ptr );
+                break;
+
             default: // This should never happen :-)
-                acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised value TYPE=%i. Ignoring", tag_ptr->type);
+                ok = acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised value TYPE=%i. Ignoring", tag_ptr->type);
                 break;
         }
     }
+
+//  Invoke the function for this command 
+    if ( func )    
+        return func();
+    else
+        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Function not found for command");
 }
 
 
@@ -195,9 +212,9 @@ long int acs_jsn_wrdmd( acs_pkt_t *pkt_ptr )
    long int off3;
 
 //  Copy values into demand
-    off1 = sprintf( dmd_azm_ptr, JSN_FMT_WRDMD, DR2D * acs_mem->DmdAzm );
-    off2 = sprintf( dmd_zd_ptr,  JSN_FMT_WRDMD, DR2D * acs_mem->DmdZD  );
-    off3 = sprintf( dmd_rot_ptr, JSN_FMT_WRDMD, DR2D * acs_mem->DmdRot );
+    off1 = sprintf( dmd_azm_ptr, JSN_FMT_WRDMD, acs_mem->DmdAzm );
+    off2 = sprintf( dmd_zd_ptr,  JSN_FMT_WRDMD, acs_mem->DmdZD  );
+    off3 = sprintf( dmd_rot_ptr, JSN_FMT_WRDMD, acs_mem->DmdRot );
 
 //  Overwrite nul terminators
     *(dmd_azm_ptr + off1) = ' ';

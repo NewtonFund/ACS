@@ -4,6 +4,13 @@
 
 #include "acs.h"
 
+#define SHM_NAME "/ACS_MEM"
+#define SHM_OPTS (O_RDWR | O_CREAT)
+#define SHM_PROT (PROT_READ | PROT_WRITE)
+#define SHM_MODE (00666 )
+int   shm_fd;
+char *shm_ptr;
+
 /*!
  * Comparison function used by qsort() to sort acs_tag table into ascending alphabetical order 
  */
@@ -27,7 +34,6 @@ int acs_ini_mkmem(void)
 {
     PError *error;
 
-    acs_dbg_lvl = 0;
     const PShm *shm;
 
     if (( shm     = p_shm_new( ACS_TXT_MEM, sizeof( acs_mem_t ), P_SHM_ACCESS_READWRITE, &error ))&&
@@ -40,6 +46,19 @@ int acs_ini_mkmem(void)
     {
         return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_ACS, "p_shm_new() failed, acs_mem=%p", acs_mem );
     }
+}
+
+
+int acs_ini_mkmem2(void)
+{
+    if (((shm_fd  = shm_open( SHM_NAME, SHM_OPTS, SHM_MODE )                 ) > 0)&& // Get shared memory file desc.
+        ( ftruncate(shm_fd,   sizeof(acs_mem_t)            )                  == 0)&& // Force size
+        ((acs_mem = mmap(NULL,sizeof(acs_mem_t),SHM_PROT,MAP_SHARED,shm_fd,0)) > 0)  )// Map shared memory
+    {
+        return true;
+    }
+
+    return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_ACS, "acs_ini_mkmem2() failed" );
 }
 
 
@@ -192,8 +211,8 @@ int acs_ini_data(  void )
 //  Initialise timer variables
 
 //  First evaluate the timer interval ...
-    acs_DemandInterval.tv_sec  = acs_mem->DemandInterval.tv_sec  = (long int)(NANOSECONDS / acs_DemandFreq) / NANOSECONDS;
-    acs_DemandInterval.tv_nsec = acs_mem->DemandInterval.tv_nsec = (long int)(NANOSECONDS / acs_DemandFreq) % NANOSECONDS;
+    acs_DemandInterval.tv_sec  = acs_mem->DemandInterval.tv_sec  = (long int)(NANOSECOND / acs_DemandFreq) / NANOSECOND;
+    acs_DemandInterval.tv_nsec = acs_mem->DemandInterval.tv_nsec = (long int)(NANOSECOND / acs_DemandFreq) % NANOSECOND;
 
 //  ... then estimate the time for an astrometric calculation  
     clock_gettime( CLOCK_REALTIME, &before );
@@ -226,11 +245,11 @@ int acs_ini_global( void )
 {
 strcpy(str_Lat,             "+18:35:15.1234")       ;
 strcpy(str_Lon,             "+98:29:12.1234")       ;
-acs_Alt                     =0.0                    ;
+acs_Alt                     =    0.0                ;
 
 acs_sktProtocol             =P_SOCKET_PROTOCOL_TCP  ;
 strcpy( str_Protocol,       "TCP")                  ; 
-strcpy( str_AddrPort,       "127.0.0.1:14000")      ;
+strcpy( str_ACSAddrPort,    "127.0.0.1:14000")      ;
 strcpy( acs_Addr,           "127.0.0.1")            ;
 acs_Port                    =14000                  ;
                                                     
@@ -300,19 +319,19 @@ acs_InstRotAngle            =    0.0                ;
 acs_InstWavelength          =  550.0                ;
 acs_InstRotates             =false                  ;
 
-acs_TrackEquinox            = ACS_EQUINOX_J2000_0   ;
-//acs_time_t acs_TrackEpoch                         ;
+acs_TrackEquinox            =ACS_EQUINOX_J2000_0    ;
+//acs_time_t acs_TrackEpoch                         
 acs_TrackRA                 =    0.0                ;
 acs_TrackDec                =    0.0                ;
 acs_TrackPMRA               =    0.0                ;
 acs_TrackPMDec              =    0.0                ;
 acs_TrackParallax           =    0.0                ;
 acs_TrackRadVel             =    0.0                ;
-strcpy(str_TrackRotFrame,     ACS_FRAME_CELEST_TXT) ;
-acs_TrackRotFrame           = ACS_FRAME_CELEST      ;
+strcpy(str_TrackRotFrame,    ACS_FRAME_CELEST_TXT)  ;
+acs_TrackRotFrame           =ACS_FRAME_CELEST       ;
 acs_TrackRotAngle           =    0.0                ;
 acs_TrackFreq               =  400                  ;
-//acs_time_t acs_TrackStart                         ;
+//acs_time_t acs_TrackStart                         
 acs_TrackDuration           =    0.0                ;
 
 acs_EnableAG                =false                  ;
@@ -331,7 +350,7 @@ strcpy(str_CorrFrame,        ACS_FRAME_CELEST_TXT)  ;
 acs_CorrFrame               =ACS_FRAME_CELEST       ;
 acs_CorrX                   =    0.0                ;
 acs_CorrY                   =    0.0                ;
-acs_CorrRotAngle            =    0.0                ;
+acs_CorrRot                 =    0.0                ;
 
 strcpy(str_OffsetType,       ACS_TYPE_FIXED_TXT)    ;
 acs_OffsetType              =ACS_TYPE_FIXED         ;
@@ -339,7 +358,7 @@ strcpy(str_OffsetFrame,      ACS_FRAME_CELEST_TXT)  ;
 acs_OffsetFrame             =ACS_FRAME_CELEST       ;
 acs_OffsetX                 =    0.0                ;
 acs_OffsetY                 =    0.0                ;
-acs_OffsetRotAngle          =    0.0                ;
+acs_OffsetRot               =    0.0                ;
                                                    
 acs_AxisState                                       ;
 acs_AxisZD                                          ;

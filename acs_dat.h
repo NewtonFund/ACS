@@ -29,7 +29,7 @@ EXTERN double acs_Alt                     ;
 
 EXTERN char   str_Protocol[STR_MAX]       ;
 EXTERN enum   PSocketProtocol_ acs_sktProtocol;
-EXTERN char   str_AddrPort[STR_MAX]       ;
+EXTERN char   str_ACSAddrPort[STR_MAX]    ;
 EXTERN char   acs_Addr[STR_MAX]           ;
 EXTERN int    acs_Port                    ;
                                           
@@ -132,7 +132,7 @@ EXTERN char   str_CorrFrame[STR_MAX]      ;
 EXTERN int    acs_CorrFrame               ;
 EXTERN double acs_CorrX                   ;
 EXTERN double acs_CorrY                   ;
-EXTERN double acs_CorrRotAngle            ;
+EXTERN double acs_CorrRot                 ;
 
 EXTERN char   str_OffsetType[STR_MAX]     ;
 EXTERN int    acs_OffsetType              ;
@@ -140,7 +140,7 @@ EXTERN char   str_OffsetFrame[STR_MAX]    ;
 EXTERN int    acs_OffsetFrame             ;
 EXTERN double acs_OffsetX                 ;
 EXTERN double acs_OffsetY                 ;
-EXTERN double acs_OffsetRotAngle          ;
+EXTERN double acs_OffsetRot               ;
 
 EXTERN int    acs_AxisState               ;
 EXTERN double acs_AxisZD                  ;

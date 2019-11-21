@@ -38,7 +38,7 @@ acs_cfg_t acs_cfg[] = {
 { "DemandFreq",      CFG_SECT_GENERAL, CFG_TYPE_INT,    &acs_DemandFreq     }, // Integer Hz        Tracking demand send rate    
 
 { "Protocol",        CFG_SECT_NET,     CFG_TYPE_STRING, &str_Protocol       }, // String  IP [TCP,UDP]    Network protocol
-{ "AddrPort",        CFG_SECT_NET,     CFG_TYPE_STRING, &str_AddrPort       }, // String  IP address:port ACS 
+{ "ACSAddrPort",     CFG_SECT_NET,     CFG_TYPE_STRING, &str_ACSAddrPort    }, // String  IP address:port ACS 
 { "CommandAddrPort", CFG_SECT_NET,     CFG_TYPE_STRING, &str_CommandAddrPort}, // String  IP address:port Source of commands 
 { "DemandAddrPort",  CFG_SECT_NET,     CFG_TYPE_STRING, &str_DemandAddrPort }, // String  IP address:port Destination for demands
 
@@ -94,25 +94,25 @@ acs_cmd_t acs_cmds[] = {
 ** COMMANDS:
 ** All recognised commands are defined in this table
 */
-// Command name       Function             Type    
-{ ACS_CMD_TRACKINIT  , acs_cmd_TrackInit  , ACS_DIR_INBOUND  },// Tracking initialise     
-{ ACS_CMD_TRACKCORR  , acs_cmd_TrackCorr  , ACS_DIR_INBOUND  },// Tracking corrections    
-{ ACS_CMD_TRACKOFFSET, acs_cmd_TrackOffset, ACS_DIR_INBOUND  },// Tracking offsets        
-{ ACS_CMD_TRACKENABLE, acs_cmd_TrackEnable, ACS_DIR_INBOUND  },// Tracking control        
-{ ACS_CMD_TRACKEND   , acs_cmd_TrackEnd   , ACS_DIR_INBOUND  },// Tracking end            
-{ ACS_CMD_TRACKWRITE , acs_cmd_TrackWrite , ACS_DIR_INBOUND  },// Write tracking info       Engineering
-{ ACS_CMD_TRACKREAD  , acs_cmd_TrackRead  , ACS_DIR_INBOUND  },// Read tracking info        Engineering
-{ ACS_CMD_TRACKRADEC , acs_cmd_TrackRADec , ACS_DIR_INBOUND  },// Tracking to RA/DEC      
-{ ACS_CMD_AGCORR     , acs_cmd_AGCorr     , ACS_DIR_INBOUND  },// Autoguider correction   
-{ ACS_CMD_AGDATUM    , acs_cmd_AGDatum    , ACS_DIR_INBOUND  },// Autoguider datum        
-{ ACS_CMD_METINFO    , acs_cmd_MetInfo    , ACS_DIR_INBOUND  },// Meteorology information 
-{ ACS_CMD_INSTINFO   , acs_cmd_InstInfo   , ACS_DIR_INBOUND  },// Instrument information  
-{ ACS_CMD_AXISINFO   , acs_cmd_AxisInfo   , ACS_DIR_INBOUND  },// Axis information        
-{ ACS_CMD_AXISDEMAND , acs_cmd_AxisDemand , ACS_DIR_OUTBOUND },// Axis demand             
-{ ACS_CMD_ACSGETPARAM, acs_cmd_ACSGetParam, ACS_DIR_INBOUND  },// Get parameter           
-{ ACS_CMD_ACSSETPRARM, acs_cmd_ACSSetParam, ACS_DIR_INBOUND  },// Set parameter           
-{ ACS_CMD_ACSRECONFIG, acs_cmd_ACSReconfig, ACS_DIR_INBOUND  },// Re-read configuration   
-{ ACS_CMD_ACSCHANGE  , acs_cmd_ACSChange  , ACS_DIR_OUTBOUND },// State change            
+//Command name         Function             Type    
+{ ACS_CMD_TRACKINIT  , acs_cmd_TrackInit  , ACS_DIR_INBOUND  }, // Tracking initialise     
+{ ACS_CMD_TRACKCORR  , acs_cmd_TrackCorr  , ACS_DIR_INBOUND  }, // Tracking corrections    
+{ ACS_CMD_TRACKOFFSET, acs_cmd_TrackOffset, ACS_DIR_INBOUND  }, // Tracking offsets        
+{ ACS_CMD_TRACKENABLE, acs_cmd_TrackEnable, ACS_DIR_INBOUND  }, // Tracking control        
+{ ACS_CMD_TRACKEND   , acs_cmd_TrackEnd   , ACS_DIR_INBOUND  }, // Tracking end            
+{ ACS_CMD_TRACKWRITE , acs_cmd_TrackWrite , ACS_DIR_INBOUND  }, // Write tracking info       Engineering
+{ ACS_CMD_TRACKREAD  , acs_cmd_TrackRead  , ACS_DIR_INBOUND  }, // Read tracking info        Engineering
+{ ACS_CMD_TRACKRADEC , acs_cmd_TrackRADec , ACS_DIR_INBOUND  }, // Tracking to RA/DEC      
+{ ACS_CMD_AGCORR     , acs_cmd_AGCorr     , ACS_DIR_INBOUND  }, // Autoguider correction   
+{ ACS_CMD_AGDATUM    , acs_cmd_AGDatum    , ACS_DIR_INBOUND  }, // Autoguider datum        
+{ ACS_CMD_METINFO    , acs_cmd_MetInfo    , ACS_DIR_INBOUND  }, // Meteorology information 
+{ ACS_CMD_INSTINFO   , acs_cmd_InstInfo   , ACS_DIR_INBOUND  }, // Instrument information  
+{ ACS_CMD_AXISINFO   , acs_cmd_AxisInfo   , ACS_DIR_INBOUND  }, // Axis information        
+{ ACS_CMD_AXISDEMAND , acs_cmd_AxisDemand , ACS_DIR_OUTBOUND }, // Axis demand             
+{ ACS_CMD_ACSGETPARAM, acs_cmd_ACSGetParam, ACS_DIR_INBOUND  }, // Get parameter           
+{ ACS_CMD_ACSSETPRARM, acs_cmd_ACSSetParam, ACS_DIR_INBOUND  }, // Set parameter           
+{ ACS_CMD_ACSRECONFIG, acs_cmd_ACSReconfig, ACS_DIR_INBOUND  }, // Re-read configuration   
+{ ACS_CMD_ACSCHANGE  , acs_cmd_ACSChange  , ACS_DIR_OUTBOUND }, // State change            
 { ACS_CMD_ACSREPLY   , acs_cmd_ACSReply   , ACS_DIR_OUTBOUND }};// Reply                   
 size_t const acs_cmds_siz = sizeof(acs_cmd_t);
 size_t const acs_cmds_num = sizeof(acs_cmds) / sizeof(acs_cmd_t);
@@ -132,7 +132,7 @@ acs_enum_t acs_enum_equinox[] = {
 acs_enum_t acs_enum_frame[] = {
 { ACS_FRAME_CELEST_TXT   , ACS_FRAME_CELEST   },
 { ACS_FRAME_MOUNT_TXT    , ACS_FRAME_MOUNT    },
-{ ACS_FRAME_INSTR_TXT    , ACS_FRAME_INSTR    },
+{ ACS_FRAME_INST_TXT     , ACS_FRAME_INST     },
 { ACS_EMPTY_TXT          , ACS_ENUM_NOT_FOUND }};
 
 acs_enum_t acs_enum_rotframe[] = {
@@ -141,9 +141,10 @@ acs_enum_t acs_enum_rotframe[] = {
 { ACS_ROTFRAME_PARAL_TXT , ACS_ROTFRAME_PARAL },
 { ACS_EMPTY_TXT          , ACS_ENUM_NOT_FOUND }};
 
+// Types of correction  or offsets
 acs_enum_t acs_enum_type[] = {
-{ ACS_TYPE_FIXED_TXT     , ACS_TYPE_FIXED     },
-{ ACS_TYPE_CUMUL_TXT     , ACS_TYPE_CUMUL     }, 
+{ ACS_TYPE_FIXED_TXT     , ACS_TYPE_FIXED },
+{ ACS_TYPE_CUMUL_TXT     , ACS_TYPE_CUMUL }, 
 { ACS_EMPTY_TXT          , ACS_ENUM_NOT_FOUND }};
 
 acs_enum_t acs_enum_ag[] = {
@@ -174,14 +175,14 @@ acs_enum_t acs_enum_axis_state[] = {
 ** TAGS:
 ** All recognised tags within messages are defined by this table.
 ** Before use, the table is sorted with qsort() so it can be searched using bsearch() 
-** Parameter is check by calling Check function, if set to NULL the no check is performed.
-** Similarly, Validate functions perform additional context/command specific checks 
+** Parameter is type checked by calling a Check fn(), NULL suppresses the check.
+** Similarly, Validate functions perform context/command specific checks 
 **
 ** The Min and Max limits have different meaning according to data type
-**  ACS_TYP_DBL: Numerical value limits
-**  ACS_TYP_INT: Numerical value limits
-**  ACS_TYP_BOOL: Can only be true or false 
-**  ACS_TYP_ENUM: Enumeration limits as defined in look-up tables in acs_tbl.h
+**  ACS_TYP_DBL:  Numerical value limits
+**  ACS_TYP_INT:  Numerical value limits
+**  ACS_TYP_BOOL: true or false 
+**  ACS_TYP_ENUM: Enumeration limits are as defined in look-up tables in acs_tbl.h
 **  ACS_TYP_STR:  String length limits
 **  ACS_TYP_IP:   Unused
 **  ASC_TYP_TIME: Unused
@@ -211,18 +212,18 @@ acs_tag_t acs_tags[] = {
 { ACS_TAG_ENABLEZD      , ACS_TYP_BOOL, &acs_EnableZD      , acs_chk_bool,   false,   true, NULL },
 { ACS_TAG_ENABLEAZM     , ACS_TYP_BOOL, &acs_EnableAzm     , acs_chk_bool,   false,   true, NULL },
 { ACS_TAG_ENABLEROT     , ACS_TYP_BOOL, &acs_EnableRot     , acs_chk_bool,   false,   true, NULL },
-{ ACS_TAG_CORRTYPE      , ACS_TYP_ENUM, &acs_CorrType      , acs_chk_enum,       1,    0.0, NULL },
-{ ACS_TAG_CORRFRAME     , ACS_TYP_ENUM, &acs_CorrFrame     , acs_chk_enum,       1,    0.0, NULL },
+{ ACS_TAG_CORRTYPE      , ACS_TYP_ENUM, &acs_CorrType      , acs_chk_enum,       1,      0, NULL },
+{ ACS_TAG_CORRFRAME     , ACS_TYP_ENUM, &acs_CorrFrame     , acs_chk_enum,       1,      0, NULL },
 { ACS_TAG_CORRX         , ACS_TYP_DBL , &acs_CorrX         , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
 { ACS_TAG_CORRY         , ACS_TYP_DBL , &acs_CorrY         , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
-{ ACS_TAG_CORRROTANGLE  , ACS_TYP_DBL , &acs_CorrRotAngle  , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
-{ ACS_TAG_OFFSETTYPE    , ACS_TYP_ENUM, &acs_OffsetType    , acs_chk_enum,       1,    0.0, NULL },
-{ ACS_TAG_OFFSETFRAME   , ACS_TYP_ENUM, &acs_OffsetFrame   , acs_chk_enum,       1,    0.0, NULL },
+{ ACS_TAG_CORRROTANGLE  , ACS_TYP_DBL , &acs_CorrRot       , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
+{ ACS_TAG_OFFSETTYPE    , ACS_TYP_ENUM, &acs_OffsetType    , acs_chk_enum,       1,      0, NULL },
+{ ACS_TAG_OFFSETFRAME   , ACS_TYP_ENUM, &acs_OffsetFrame   , acs_chk_enum,       1,      0, NULL },
 { ACS_TAG_OFFSETX       , ACS_TYP_DBL , &acs_OffsetX       , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
 { ACS_TAG_OFFSETY       , ACS_TYP_DBL , &acs_OffsetY       , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
-{ ACS_TAG_OFFSETROTANGLE, ACS_TYP_DBL , &acs_OffsetRotAngle, acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
-{ ACS_TAG_AGTYPE        , ACS_TYP_ENUM, &acs_AGType        , acs_chk_str ,       1,    0.0, NULL },
-{ ACS_TAG_AGFRAME       , ACS_TYP_ENUM, &acs_AGFrame       , acs_chk_str ,       1,    0.0, NULL },
+{ ACS_TAG_OFFSETROTANGLE, ACS_TYP_DBL , &acs_OffsetRot     , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
+{ ACS_TAG_AGTYPE        , ACS_TYP_ENUM, &acs_AGType        , acs_chk_str ,       1,      0, NULL },
+{ ACS_TAG_AGFRAME       , ACS_TYP_ENUM, &acs_AGFrame       , acs_chk_str ,       1,      0, NULL },
 { ACS_TAG_AGX           , ACS_TYP_DBL , &acs_AGX           , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
 { ACS_TAG_AGY           , ACS_TYP_DBL , &acs_AGY           , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
 { ACS_TAG_AGROTANGLE    , ACS_TYP_DBL , &acs_AGRotAngle    , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
@@ -238,11 +239,11 @@ acs_tag_t acs_tags[] = {
 { ACS_TAG_AXISSTATE     , ACS_TYP_INT , &acs_AxisState     , acs_chk_int , ACS_STATE_IDLE, ACS_STATE_ERROR, NULL },
 { ACS_TAG_AXISZD        , ACS_TYP_DBL , &acs_AxisZD        , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
 { ACS_TAG_AXISAZM       , ACS_TYP_DBL , &acs_AxisAzm       , acs_chk_dbl ,-DBL_MAX,DBL_MAX, NULL },
-{ ACS_TAG_AXISROTANGLE  , ACS_TYP_BOOL, &acs_AxisRotAngle  , acs_chk_bool,   false,   true, NULL },
+{ ACS_TAG_AXISROTANGLE  , ACS_TYP_DBL , &acs_AxisRotAngle  , acs_chk_dbl, -DBL_MAX,DBL_MAX, NULL },
 { ACS_TAG_LOGFILE       , ACS_TYP_STR , &acs_LogFile       , acs_chk_str ,     0.0,STR_MAX, NULL },
 { ACS_TAG_LOGADDRPORT   , ACS_TYP_IP  , &str_LogAddrPort   , acs_chk_ip  ,     0.0,    0.0, NULL },
 { ACS_TAG_LOGFREQ       , ACS_TYP_DBL , &acs_LogFreq       , acs_chk_dbl ,    -1.0,  400.0, NULL },
-{ ACS_TAG_LOGACTION     , ACS_TYP_ENUM, &acs_LogAction     , acs_chk_str ,     0.0,    0.0, NULL },
+{ ACS_TAG_LOGACTION     , ACS_TYP_ENUM, &acs_LogAction     , acs_chk_str ,       1,      0, NULL },
 { ACS_TAG_ACSNEWSTATE   , ACS_TYP_STR , &acs_ACSNewState   , acs_chk_str ,       1,STR_MAX, NULL },
 { ACS_TAG_ACSREASON     , ACS_TYP_STR , &acs_ACSReason     , acs_chk_str ,       1,STR_MAX, NULL }};
 size_t const acs_tags_siz = sizeof(acs_tag_t);

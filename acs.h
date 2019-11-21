@@ -9,10 +9,10 @@
 
 // Debug levels
 #define DBG0 0  // Off
-#define DBG1 1  // Light, command and state changes 
-#define DBG2 2  // Medium, file and shared memeory update access 
-#define DBG3 3  // Very verbose
-#define DBG_LVL DBG3
+#define DBG1 1  // Light: command and state changes 
+#define DBG2 2  // Medium: file and shared memory update access 
+#define DBG3 3  // Verbose:  
+#define DBG_DEFAULT DBG0
 
 // C standard headers
 #include <stdio.h>
@@ -21,8 +21,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <stdbool.h>
 #include <errno.h>
@@ -34,10 +37,10 @@
 // sofa header 
 #include <sofa.h>
 
-
-#define NANOSECONDS 1000000000L // Number of nanoseconds in a second 
-
-#define ACS_PKT_START 25510027
+#define NANOSECOND 1000000000L                // Number of nanoseconds in a second 
+#define MAS2DEG          0.001                // Milli-arcsec to degree 
+#define MAS2RAD          (DPI/648000000.0)     // Milli-arcsec to radians 
+#define ACS_PKT_START 25510027  // ACS packet signature
 
 // Packet command types
 #define ACS_PKT_TYPE_GET       1 //
@@ -57,7 +60,7 @@
 
 #define ACS_TXT_MEM      "ACS_MEM"          // Memory block name
 #define ACS_LEN_INSTNAME  255               // Maximum length of an instrument name
-#define ACS_INI_FILE     "acs.ini"          // Configuration file
+#define ACS_INI_FILE     "acs.ini"          // Default configuration file
 
 // List of ACS Command tags (separated by functional group)     
 #define ACS_CMD_TRACKINIT      "TrackInit"    // Tracking initialise     Inbound
@@ -172,10 +175,10 @@
 
 #define ACS_FRAME_CELEST_TXT     "CELESTIAL"
 #define ACS_FRAME_MOUNT_TXT      "MOUNT"
-#define ACS_FRAME_INSTR_TXT      "INSTRUMENT"
+#define ACS_FRAME_INST_TXT       "INSTRUMENT"
 #define ACS_FRAME_CELEST         1 
 #define ACS_FRAME_MOUNT          2 
-#define ACS_FRAME_INSTR          3 
+#define ACS_FRAME_INST           3 
 
 #define ACS_ROTFRAME_CELEST_TXT  "CELESTIAL"
 #define ACS_ROTFRAME_MOUNT_TXT   "MOUNT"
@@ -200,10 +203,16 @@
 #define ACS_STATE_WARN           3
 #define ACS_STATE_ERROR          4
 
-#define ACS_TYPE_FIXED_TXT       "FIXED"
-#define ACS_TYPE_CUMUL_TXT       "CUMULATIVE"
-#define ACS_TYPE_FIXED           1  
-#define ACS_TYPE_CUMUL           2 
+#define ACS_TYPE_FIXED_TXT   "FIXED"
+#define ACS_TYPE_CUMUL_TXT   "CUMULATIVE"
+#define ACS_TYPE_NONE        0  
+#define ACS_TYPE_FIXED       1  
+#define ACS_TYPE_CUMUL       2 
+
+//#define ACS_OFFSETTYPE_FIXED_TXT   "FIXED"
+//#define ACS_OFFSETTYPE_CUMUL_TXT   "CUMULATIVE"
+//#define ACS_OFFSETTYPE_FIXED       1  
+//#define ACS_OFFSETTYPE_CUMUL       2 
 
 #define ACS_LOGACTION_REPLAY_TXT    "REPLAY"
 #define ACS_LOGACTION_GOTO_TXT      "GOTO"
@@ -234,7 +243,8 @@
 // Logging 
 #define ACS_LOG_FILE    "/tmp/acs_errlog.log"  // Default log file
 #define ACS_TSTAMP_FMT  "%FT%T"                // Timestamp format ISO 
-#define ACS_PERROR      "ACS: "
+#define ACS_LOG_ERR     ACS_PFX_WRN_TXT"_"ACS_FAC_LOG_TXT": Failed to write to log file"
+#define ACS_SUB_ERR     ACS_PFX_ERR_TXT"_"ACS_FAC_ACS_TXT": Failed to spawn sub-process"
 
 // Severity prefix
 #define ACS_PFX_INF      0                 // Information
@@ -242,13 +252,15 @@
 #define ACS_PFX_ERR      2                 // Fatal error
 #define ACS_PFX_LIB      3                 // Fatal plibsys error 
 #define ACS_PFX_SYS      4                 // Fatal system error 
+#define ACS_PFX_DBG      5 
 
 // Severity prefix
-#define ACS_PFX_INF_TXT  "INF"                 // Information
-#define ACS_PFX_WRN_TXT  "WRN"                 // Warning. Recoverable or ignorable
-#define ACS_PFX_ERR_TXT  "ERR"                 // Fatal error
-#define ACS_PFX_LIB_TXT  "LIB"                 // Fatal plibsys error 
-#define ACS_PFX_SYS_TXT  "SYS"                 // Fatal system error 
+#define ACS_PFX_INF_TXT  "INF"             // Information
+#define ACS_PFX_WRN_TXT  "WRN"             // Warning. Recoverable or ignorable
+#define ACS_PFX_ERR_TXT  "ERR"             // Fatal error
+#define ACS_PFX_LIB_TXT  "LIB"             // Fatal plibsys error 
+#define ACS_PFX_SYS_TXT  "SYS"             // Fatal system error 
+#define ACS_PFX_DBG_TXT  "DBG"             // Debug 
 
 // Facility number 
 #define ACS_FAC_ACS      0 
@@ -282,23 +294,24 @@ typedef struct acs_time_s {
 // Shared memory structure 
 typedef struct acs_mem_s {
 // IPC variables
-    bool   Ready;       // Shared memory data is valid and ready to be used
-    double ReqRadRA;    // TrackRa  + Corr. + Offset + AG offset in radians
-    double ReqRadDec;   // TrackDec + Corr. + Offset + AG offset in radians
-    double DeltaAlt;    // 
-    double DeltaZD;     //
-    double DeltaTime;   // 
+    bool   Ready;         // Shared memory data is valid and ready to be used
+    double ReqRadRA;      // TrackRa  + Corr. + Offset + AG offset in radians
+    double ReqRadDec;     // TrackDec + Corr. + Offset + AG offset in radians
+    double DeltaTime;     // [s]  
+    double DeltaRot;      // [deg]
+    double DeltaAzm;      // [deg]
+    double DeltaZD;       // [deg]
 
 // Astrometric engine data
-    double Lat;    // Latitude
-    double Lon;    // Longitude
-    double Alt;    // Altitude above sea level
-    double PolarX;
-    double PolarY;
-    double Press;
-    double Temp;
-    double RH;
-    double DUT1;
+    double Lat;    // [deg] Latitude
+    double Lon;    // [deg] Longitude
+    double Alt;    // [m]   Altitude above sea level
+    double PolarX; // 
+    double PolarY; //
+    double Press;  // [mB] Pressure 0.0 = suppress correction
+    double Temp;   // [C]  Temperature
+    double RH;     //      Relative humidity 0.0-1.0
+    double DUT1;   // [s]  Delta UT offset 
 
 // Tracking
     bool   EnablePMRA;
@@ -329,15 +342,15 @@ typedef struct acs_mem_s {
     int    CorrFrame;
     double CorrX;
     double CorrY;
-    double CorrRotAngle;
+    double CorrRot;
 
 // Offset
     bool   EnableOffset;
     int    OffsetType;
     int    OffsetFrame;
     double OffsetX;
-    double OffsetY;
-    double OffsetRotAngle;
+    double OffsetY;   
+    double OffsetRot;
 
 //Autoguider
     bool   EnableAG;
@@ -458,11 +471,13 @@ typedef struct acs_cfg_s {
 //  double hi;  // Sanity check
 } acs_cfg_t;
 
+
 // ACS Command Table
+typedef int (*acs_func_t)(void);
 typedef struct acs_cmd_s {
-    char *name;  // Command name
-    void *fn;    // Command function  
-    int   dir;   // Command direction (inbound or outbound)
+    char *name;      // Command name
+    acs_func_t func; // Command function  
+    int   dir;       // Command direction (inbound or outbound)
 } acs_cmd_t;
 
 // ACS Tag Table
@@ -484,17 +499,21 @@ typedef struct acs_enum_s {
 
 
 // Macro prototypes
-#define acs_debug( lvl, fmt, ...) lvl >= acs_dbg_lvl ? printf( "DBG: "fmt, __VA_ARGS__):0;puts("")
+#define acs_debug( lvl, fmt, ...) acs_dbg_lvl >= lvl ? printf( "DBG: "fmt"\n", __VA_ARGS__):0
 
 // Global function prototypes
 int acs_close( void );
 
-int             utl_val2enum( unsigned char *val, unsigned char *tbl[] );
-struct timespec utl_ts_add( struct timespec *t1, struct timespec *t2 );
-struct timespec utl_ts_sub( struct timespec *t1, struct timespec *t2 );
-int             utl_ts_cmp( struct timespec *t1, struct timespec *t2 );
+int              utl_val2enum( unsigned char *val, unsigned char *tbl[] );
+acs_func_t       utl_cmd2func( unsigned char *cmd );
+struct timespec *utl_dbl2ts( double dbl );
+struct timespec  utl_ts_add( struct timespec *t1, struct timespec *t2 );
+struct timespec  utl_ts_sub( struct timespec *t1, struct timespec *t2 );
+int              utl_ts_cmp( struct timespec *t1, struct timespec *t2 );
+int              utl_filexist( char *file );
 
 int acs_ini_mkmem( void );
+int acs_ini_mkmem2( void );
 int acs_ini_read ( void );
 int acs_ini_data ( void );
 int acs_ast_calc ( struct timespec *ts );
