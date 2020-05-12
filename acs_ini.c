@@ -1,8 +1,8 @@
 /*!
- * Initialisation and startup functions 
+ * ACS Initialisation and startup functions 
  */
-
 #include "acs.h"
+#define FAC ACS_FAC_INI
 
 #define SHM_NAME "/ACS_MEM"
 #define SHM_OPTS (O_RDWR | O_CREAT)
@@ -10,6 +10,7 @@
 #define SHM_MODE (00666 )
 int   shm_fd;
 char *shm_ptr;
+
 
 /*!
  * Comparison function used by qsort() to sort acs_tag table into ascending alphabetical order 
@@ -29,8 +30,9 @@ int acs_cmds_cmp( const void *ptr1, const void *ptr2 )
 
 /*!
  * Create and zero shared memory block 
-*/
-int acs_ini_mkmem(void)
+ * FAULTY plibsys fails under cygwin
+ */
+int ini_mkmem_plib(void)
 {
     PError *error;
 
@@ -44,12 +46,12 @@ int acs_ini_mkmem(void)
     }
     else
     {
-        return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_ACS, "p_shm_new() failed, acs_mem=%p", acs_mem );
+        return log_msg( ACS_FAILURE, LOG_SYS, FAC, "p_shm_new_plib() failed, acs_mem=%p", acs_mem );
     }
 }
 
 
-int acs_ini_mkmem2(void)
+int ini_mkmem(void)
 {
     if (((shm_fd  = shm_open( SHM_NAME, SHM_OPTS, SHM_MODE )                 ) > 0)&& // Get shared memory file desc.
         ( ftruncate(shm_fd,   sizeof(acs_mem_t)            )                  == 0)&& // Force size
@@ -58,14 +60,14 @@ int acs_ini_mkmem2(void)
         return true;
     }
 
-    return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_ACS, "acs_ini_mkmem2() failed" );
+    return log_msg( ACS_FAILURE, LOG_SYS, FAC, "ini_mkmem() failed" );
 }
 
 
 /*!
  * Read configuration .ini file
  */
-int acs_ini_read( void )
+int ini_read( void )
 {
     int i;
 
@@ -76,7 +78,7 @@ int acs_ini_read( void )
 
     if ( !p_ini_file_parse( file, &error ) )
     {
-        return acs_log_msg( ACS_FAILURE, ACS_PFX_ERR, ACS_FAC_CFG, "Failed to read .ini file" );
+        return log_msg( ACS_FAILURE, LOG_ERR, FAC, "Failed to read .ini file" );
     }
     else
     {
@@ -84,22 +86,22 @@ int acs_ini_read( void )
             switch (acs_cfg[i].type) {
                 case CFG_TYPE_INT:
                     *(int *)acs_cfg[i].ptr = p_ini_file_parameter_int( file, acs_cfg[i].sect, acs_cfg[i].key, 0 );
-                    acs_debug( DBG3, "%s=%i", acs_cfg[i].key, *(int *)acs_cfg[i].ptr );
+                    log_msg( false, LOG_DBG, FAC, "%s=%i", acs_cfg[i].key, *(int *)acs_cfg[i].ptr );
                     break;
 
                 case CFG_TYPE_DOUBLE:
                     *(double *)acs_cfg[i].ptr = p_ini_file_parameter_double( file, acs_cfg[i].sect, acs_cfg[i].key, 0.0 );
-                    acs_debug( DBG3, "%s=%f", acs_cfg[i].key, *(double *)acs_cfg[i].ptr );
+                    log_msg( false, LOG_DBG, FAC, "%s=%f", acs_cfg[i].key, *(double *)acs_cfg[i].ptr );
                     break;
 
                 case CFG_TYPE_BOOLEAN:
                     *(unsigned char *)acs_cfg[i].ptr = p_ini_file_parameter_boolean( file, acs_cfg[i].sect, acs_cfg[i].key, FALSE );
-                    acs_debug( DBG3, "%s=%s", acs_cfg[i].key, *(int *)acs_cfg[i].ptr ? "TRUE":"FALSE");
+                    log_msg( false, LOG_DBG, FAC, "%s=%s", acs_cfg[i].key, *(int *)acs_cfg[i].ptr ? "TRUE":"FALSE");
                     break;
 
                 case CFG_TYPE_STRING:
                     strcpy( (char *)acs_cfg[i].ptr, (char *)p_ini_file_parameter_string( file, acs_cfg[i].sect, acs_cfg[i].key, ""));
-                    acs_debug( DBG3, "%s=%s", acs_cfg[i].key, (char *)acs_cfg[i].ptr );
+                    log_msg( false, LOG_DBG, FAC, "%s=%s", acs_cfg[i].key, (char *)acs_cfg[i].ptr );
                     break;
 
                 default:
@@ -115,7 +117,7 @@ int acs_ini_read( void )
  *  Final evaluation and init. of running data.
  *  Includes sanity checks  
  */
-int acs_ini_data(  void )
+int ini_data(  void )
 {
     char   LatSgn;
     int    LatDeg;
@@ -151,20 +153,20 @@ int acs_ini_data(  void )
             ( acs_mem->Lon >= -DPI     )  ) 
         {
             acs_mem->Alt = acs_Alt;
-            acs_debug( DBG3, "Lat=%s=%lf [rad] Lon=%s=%lf [rad]", str_Lat, acs_mem->Lat, str_Lon, acs_mem->Lon );
+            log_msg( false, LOG_DBG, FAC, "Lon=%s=%lf [rad] Lat=%s=%lf [rad]", str_Lon, acs_mem->Lon, str_Lat, acs_mem->Lat );
         }
         else
         {
-            return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_CFG,
-                                "Location out of limits: Latitude=%f Longitude=%f [rad]",
-                                acs_mem->Lat, acs_mem->Lon );  
+            return log_msg( ACS_FAILURE, LOG_SYS, FAC,
+                            "Location out of limits: Latitude=%f Longitude=%f [rad]",
+                            acs_mem->Lat, acs_mem->Lon );  
         } 
     }
     else
     {
-        return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_CFG,
-                            "Invalid location format: Latitude=%s Longitude=%s [+/-DDD:MM.SS.sss]",
-                            str_Lat, str_Lon );  
+        return log_msg( ACS_FAILURE, LOG_SYS, FAC,
+                        "Invalid location format: Latitude=%s Longitude=%s [+/-DDD:MM.SS.sss]",
+                        str_Lat, str_Lon );  
     }
 
 /*  Identify the IP protocol to be used */
@@ -173,15 +175,15 @@ int acs_ini_data(  void )
     else if ( !strcmp( str_Protocol, "UDP" ))
         acs_sktProtocol = P_SOCKET_PROTOCOL_UDP;
     else
-        return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_CFG, "Invalid network protocol=%s", str_Protocol );  
-    acs_debug( DBG3, "Network protocol=%s", str_Protocol );
+        return log_msg( ACS_FAILURE, LOG_SYS, FAC, "Invalid network protocol=%s", str_Protocol );  
+    log_msg( false, LOG_DBG, FAC, "Network protocol=%s", str_Protocol );
 
-//  Unpack and check network port addresses and ports */    
-    if ( !acs_net_chk( str_CommandAddrPort,  acs_CommandAddr, &acs_CommandPort ) ) 
-        return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_CFG, "Bad Command IP Address:Port=%s", str_CommandAddrPort );  
+//  Unpack and check network port addresses and ports     
+    if ( !net_chk_addr( str_CommandAddrPort,  acs_CommandAddr, &acs_CommandPort ) ) 
+        return log_msg( ACS_FAILURE, LOG_SYS, FAC, "Bad Command IP Address:Port=%s", str_CommandAddrPort );  
 
-    if ( !acs_net_chk( str_DemandAddrPort,   acs_DemandAddr,  &acs_DemandPort  ) ) 
-        return acs_log_msg( ACS_FAILURE, ACS_PFX_SYS, ACS_FAC_CFG, "Bad Demand IP Address:Port=%s", str_DemandAddrPort );  
+    if ( !net_chk_addr( str_DemandAddrPort,   acs_DemandAddr,  &acs_DemandPort  ) ) 
+        return log_msg( ACS_FAILURE, LOG_SYS, FAC, "Bad Demand IP Address:Port=%s", str_DemandAddrPort );  
 
 //  Init. network interface for incoming commands 
     acs_net_cmd.Protocol   = str_Protocol;
@@ -209,10 +211,9 @@ int acs_ini_data(  void )
     strcpy( acs_mem->InstName, acs_InstName );
 
 //  Initialise timer variables
-
 //  First evaluate the timer interval ...
-    acs_DemandInterval.tv_sec  = acs_mem->DemandInterval.tv_sec  = (long int)(NANOSECOND / acs_DemandFreq) / NANOSECOND;
-    acs_DemandInterval.tv_nsec = acs_mem->DemandInterval.tv_nsec = (long int)(NANOSECOND / acs_DemandFreq) % NANOSECOND;
+    acs_DemandInterval.tv_sec  = acs_mem->DemandInterval.tv_sec  = (long)(NANOSECOND / acs_DemandFreq) / NANOSECOND;
+    acs_DemandInterval.tv_nsec = acs_mem->DemandInterval.tv_nsec = (long)(NANOSECOND / acs_DemandFreq) % NANOSECOND;
 
 //  ... then estimate the time for an astrometric calculation  
     clock_gettime( CLOCK_REALTIME, &before );
@@ -220,15 +221,15 @@ int acs_ini_data(  void )
     clock_gettime( CLOCK_REALTIME, &after );
     acs_DemandLatency = utl_ts_sub( &after, &before ); 
 
-    acs_log_msg( true, ACS_PFX_INF, ACS_FAC_CFG, "Astrometric Calc. latency=%li.%li sec", 
-                 acs_DemandLatency.tv_sec, acs_DemandLatency.tv_nsec );
+    log_msg( true, LOG_INF, FAC, "Astrometric Calc. latency=%li.%li sec", 
+             acs_DemandLatency.tv_sec, acs_DemandLatency.tv_nsec );
 
 //  Warn if the time to calculate a demand (latency) is greater than the demand interval
 //  and set the latency to {0,0} to run as fast as possible
-    if ( utl_ts_cmp( &acs_DemandInterval, &acs_DemandLatency ) )
+    if ( utl_ts_cmp( &acs_DemandInterval, &acs_DemandLatency ) == -1)
     {
-        acs_log_msg( true, ACS_PFX_WRN, ACS_FAC_CFG, "Latency=%li.%li [sec] greater than demand interval=%li.%li [sec]",
-                     acs_DemandLatency.tv_sec, acs_DemandLatency.tv_nsec, acs_DemandInterval.tv_sec, acs_DemandInterval.tv_nsec );  
+        log_msg( true, LOG_WRN, FAC, "Latency=%li.%li [sec] greater than demand interval=%li.%li [sec]",
+                 acs_DemandLatency.tv_sec, acs_DemandLatency.tv_nsec, acs_DemandInterval.tv_sec, acs_DemandInterval.tv_nsec );  
         acs_DemandLatency.tv_sec  = 0;
         acs_DemandLatency.tv_nsec = 0;
     }
@@ -241,17 +242,20 @@ int acs_ini_data(  void )
  * These may be overwritten by configuration file defaults
  * No checks or conversions
  */
-int acs_ini_global( void )
+int ini_global( void )
 {
+acs_log_lvl                 = ACS_LOG_DEFAULT       ;
+
 strcpy(str_Lat,             "+18:35:15.1234")       ;
 strcpy(str_Lon,             "+98:29:12.1234")       ;
 acs_Alt                     =    0.0                ;
 
+acs_StartPackage            =ACS_STARTPACKAGE       ;
 acs_sktProtocol             =P_SOCKET_PROTOCOL_TCP  ;
 strcpy( str_Protocol,       "TCP")                  ; 
-strcpy( str_ACSAddrPort,    "127.0.0.1:14000")      ;
+strcpy( str_ACSAddrPort,    "127.0.0.1:9000")       ;
 strcpy( acs_Addr,           "127.0.0.1")            ;
-acs_Port                    =14000                  ;
+acs_Port                    = 9000                  ;
                                                     
 strcpy( acs_Dir,            "./")                   ;
                                                     
@@ -279,18 +283,18 @@ acs_DUTC                    =    0.34               ;
 acs_PolarX                  =    0.0                ;
 acs_PolarY                  =    0.0                ;
                                                     
-strcpy(str_CommandAddrPort, "127.0.0.1:14111")      ;
+strcpy(str_CommandAddrPort, "127.0.0.1:9001")       ;
 strcpy(acs_CommandAddr,     "127.0.0.1")            ;
-acs_CommandPort             =14111                  ;
+acs_CommandPort             = 9001                  ;
                                                     
-strcpy(str_DemandAddrPort,  "127.0.0.1:14222")      ;
+strcpy(str_DemandAddrPort,  "127.0.0.1:9002")       ;
 strcpy(acs_DemandAddr,      "127.0.0.1")            ;
-acs_DemandPort              =14222                  ;
+acs_DemandPort              = 9002                  ;
 acs_DemandFreq                                      ;
 
-strcpy(str_AGAddrPort,      "127.0.0.1:14333")      ;
+strcpy(str_AGAddrPort,      "127.0.0.1:9003")       ;
 strcpy(acs_AGAddr,          "127.0.0.1")            ;
-acs_AGPort                  =14333                  ;
+acs_AGPort                  = 9003                  ;
 strcpy(str_AGFrame,          ACS_FRAME_CELEST_TXT)  ;
 acs_AGFrame                 =ACS_FRAME_CELEST       ;
 strcpy(str_AGType,           ACS_AG_STAR_TXT)       ;
@@ -304,9 +308,9 @@ strcpy(str_AGSmoothing,      ACS_SMOOTHING_NONE_TXT);
 acs_AGSmoothing             =ACS_SMOOTHING_NONE     ;
 acs_AGSampleSize            =    3                  ;
 
-strcpy(str_MetAddrPort,     "127.0.0.1:14444")      ;
+strcpy(str_MetAddrPort,     "127.0.0.1:9004")       ;
 strcpy(acs_MetAddr,         "127.0.0.1"      )      ;
-acs_MetPort                 =14444                  ;
+acs_MetPort                 = 9004                  ;
 acs_MetPress                = 1000.0                ;
 acs_MetTemp                 =   20.0                ;
 acs_MetRH                   =    0.5                ;
@@ -366,9 +370,9 @@ acs_AxisAzm                                         ;
 acs_AxisRotAngle                                    ;
 
 strcpy(acs_LogFile,         "acs.log" )             ;
-strcpy(str_LogAddrPort,     "127.0.0.1:14555" )     ;
+strcpy(str_LogAddrPort,     "127.0.0.1:9005" )      ;
 strcpy(acs_LogAddr,         "127.0.0.1" )           ;
-acs_LogPort                 =14555                  ;
+acs_LogPort                 = 9005                  ;
 acs_LogFreq                 =    0.0                ;
 strcpy(str_LogAction,        ACS_LOGACTION_GOTO_TXT);
 acs_LogAction               =ACS_LOGACTION_GOTO     ;

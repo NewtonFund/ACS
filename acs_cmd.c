@@ -4,9 +4,40 @@
  *       ONLY DATA IS COPIED TO SHARED MEMEORY WITHOUT STATE VALIDATION
  */
 #include "acs.h"
+#define FAC ACS_FAC_CMD
+
+
+/*
+ * Find command in table using text name
+ * Another sequential search through a small table
+ */
+acs_func_t cmd_func( unsigned char *cmd )
+{
+    int i = acs_cmds_num;
+
+    while ( i-- )
+    {
+//     Return addres of table entry that matches
+       if  ( !strcmp( acs_cmds[i].name, cmd ) )
+           return acs_cmds[i].func;
+    }
+
+//  Failed to find command
+    return NULL;
+}
+
+
+/*
+ * Place holder command that does nothing
+ */
+int cmd_Null( void)
+{
+    return true;
+}
+
 
 // Command name       Function             Type    
-int acs_cmd_TrackInit  (void)
+int cmd_TrackInit  (void)
 {
     acs_mem->TrackEquinox  = acs_TrackEquinox; 
     acs_mem->TrackEpoch    = acs_TrackEpoch; 
@@ -21,7 +52,6 @@ int acs_cmd_TrackInit  (void)
     acs_mem->TrackFreq     = acs_TrackFreq; 
     acs_mem->TrackStart    = acs_TrackStart; 
     acs_mem->TrackDuration = acs_TrackDuration; 
-
     acs_mem->EnableCorr    = acs_EnableCorr; 
     acs_mem->EnableOffset  = acs_EnableOffset; 
     acs_mem->EnableAG      = acs_EnableAG; 
@@ -35,7 +65,7 @@ int acs_cmd_TrackInit  (void)
     return true;
 }
 
-int acs_cmd_TrackCorr  (void)
+int cmd_TrackCorr  (void)
 {
     if      ( ( acs_CorrFrame == ACS_FRAME_MOUNT )&&
               ( acs_CorrType  == ACS_TYPE_FIXED  )  )
@@ -86,13 +116,13 @@ int acs_cmd_TrackCorr  (void)
     }
     else 
     {
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_CHK, "Unrecognised correction" );
+        return log_msg( false, LOG_WRN, FAC, "Unrecognised correction" );
     }
 
     return true;
 }
 
-int acs_cmd_TrackOffset(void)
+int cmd_TrackOffset(void)
 {
     acs_mem->OffsetFrame = acs_OffsetFrame;
     acs_mem->OffsetType  = acs_OffsetType;
@@ -146,13 +176,13 @@ int acs_cmd_TrackOffset(void)
     }
     else 
     {
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_CHK, "Unrecognised Offset: Type=%i Frame=%i", acs_OffsetType, acs_OffsetFrame );
+        return log_msg( false, LOG_WRN, FAC, "Unrecognised Offset: Type=%i Frame=%i", acs_OffsetType, acs_OffsetFrame );
     }
 
     return true;
 }
 
-int acs_cmd_TrackEnable(void)
+int cmd_TrackEnable(void)
 {
     acs_mem->EnableAzm    = acs_EnableAzm; 
     acs_mem->EnableZD     = acs_EnableZD; 
@@ -167,28 +197,28 @@ int acs_cmd_TrackEnable(void)
     return true;
 }
 
-int acs_cmd_TrackEnd   (void)
+int cmd_TrackEnd   (void)
 {
     acs_mem->Ready = false;    
     return true;
 }
 
-int acs_cmd_TrackWrite (void) 
+int cmd_TrackWrite (void) 
 {
     return true;
 }
 
-int acs_cmd_TrackRead  (void) 
+int cmd_TrackRead  (void) 
 {
     return true;
 }
 
-int acs_cmd_TrackRADec (void)
+int cmd_TrackRADec (void)
 {
     return true;
 }
 
-int acs_cmd_AGCorr     (void)
+int cmd_AGCorr     (void)
 {
     acs_mem->AGFrame      = acs_AGFrame;
     acs_mem->AGX          = acs_AGX;
@@ -200,12 +230,12 @@ int acs_cmd_AGCorr     (void)
     return true;
 }
 
-int acs_cmd_AGDatum    (void)
+int cmd_AGDatum    (void)
 {
     return true;
 }
 
-int acs_cmd_MetInfo    (void)
+int cmd_MetInfo    (void)
 {
     acs_mem->MetTemp  = acs_MetTemp;
     acs_mem->MetPress = acs_MetPress;
@@ -213,7 +243,7 @@ int acs_cmd_MetInfo    (void)
     return true;
 }
 
-int acs_cmd_InstInfo   (void)
+int cmd_InstInfo   (void)
 {
     strncpy( acs_mem->InstName, acs_InstName, STR_MAX );
     acs_mem->InstRotAngle   = acs_InstRotAngle;
@@ -222,38 +252,38 @@ int acs_cmd_InstInfo   (void)
     return true;
 }
 
-int acs_cmd_AxisInfo   (void)
+int cmd_AxisInfo   (void)
 {
     return true;
 }
 
-int acs_cmd_AxisDemand (void)
+int cmd_AxisDemand (void)
 {
     return true;
 }
 
-int acs_cmd_ACSGetParam(void)
+int cmd_ACSGetParam(void)
 {
     return true;
 }
 
-int acs_cmd_ACSSetParam(void)
+int cmd_ACSSetParam(void)
 {
     return true;
 }
 
-int acs_cmd_ACSReconfig(void)
+int cmd_ACSReconfig(void)
 {
     return true;
 }
 
-int acs_cmd_ACSChange  (void)
+int cmd_ACSChange  (void)
 {
 //  No parameters
     return true;
 }
 
-int acs_cmd_ACSReply   (void)  
+int cmd_ACSReply   (void)  
 {
     return true;
 }

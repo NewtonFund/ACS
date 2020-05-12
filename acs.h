@@ -7,12 +7,7 @@
 #define EXTERN extern
 #endif
 
-// Debug levels
-#define DBG0 0  // Off
-#define DBG1 1  // Light: command and state changes 
-#define DBG2 2  // Medium: file and shared memory update access 
-#define DBG3 3  // Verbose:  
-#define DBG_DEFAULT DBG0
+#define ACS_LOG_DEFAULT 6 
 
 // C standard headers
 #include <stdio.h>
@@ -22,33 +17,41 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <time.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <limits.h>
 #include <float.h>
+#include <string.h>
 
-// plibsys header 
+// 3rd party headers 
 #include <plibsys.h>
-// sofa header 
 #include <sofa.h>
 
-#define NANOSECOND 1000000000L                // Number of nanoseconds in a second 
-#define MAS2DEG          0.001                // Milli-arcsec to degree 
-#define MAS2RAD          (DPI/648000000.0)     // Milli-arcsec to radians 
-#define ACS_PKT_START 25510027  // ACS packet signature
+// Build version
+#define ACS_VERSION 0.9                   // 0.x = Development 1.x = Release 
+
+// Conversion constants
+#define TIME_NOW         NULL
+#define NANOSECOND       1000000000L       // No. of nanoseconds in a second 
+#define MICROSECOND      1000000.0         // No. of microseconds in a second 
+#define TIMETICK         10000000L         // No. of timestamp ticks in a second
+#define SECONDS1970      62135596800.0     // Seconds from 1 AD to 1970 AD
+#define MAS2DEG          0.001             // Milli-arcsec to degree 
+#define MAS2RAD          (DPI/648000000.0) // Milli-arcsec to radians 
+#define ACS_STARTPACKAGE 25510027          // ACS packet signature
 
 // Packet command types
-#define ACS_PKT_TYPE_GET       1 //
-#define ACS_PKT_TYPE_SET       2 //
-#define ACS_PKT_TYPE_SUBSCRIBE 3 //
-#define ACS_PKT_TYPE_CALLBACK  4 //
-#define ACS_PKT_TYPE_ACK       5 //
-#define ACS_PKT_TYPE_ERROR     6 //
+#define ACS_HDR_TYPE_GET       1 //
+#define ACS_HDR_TYPE_SET       2 //
+#define ACS_HDR_TYPE_SUBSCRIBE 3 //
+#define ACS_HDR_TYPE_CALLBACK  4 //
+#define ACS_HDR_TYPE_ACK       5 //
+#define ACS_HDR_TYPE_ERROR     6 //
 
 #define STR_MAX   64  // Max length of a tag in a message
 #define DIR_MAX  256  // Max length of a directory spec. 
@@ -63,161 +66,145 @@
 #define ACS_INI_FILE     "acs.ini"          // Default configuration file
 
 // List of ACS Command tags (separated by functional group)     
-#define ACS_CMD_TRACKINIT      "TrackInit"    // Tracking initialise     Inbound
-#define ACS_CMD_TRACKCORR      "TrackCorr"    // Tracking corrections    Inbound
-#define ACS_CMD_TRACKOFFSET    "TrackOffset"  // Tracking offsets        Inbound
-#define ACS_CMD_TRACKENABLE    "TrackEnable"  // Tracking control        Inbound
-#define ACS_CMD_TRACKEND       "TrackEnd"     // Tracking end            Inbound
-#define ACS_CMD_TRACKWRITE     "TrackLog"     // Write tracking info     Inbound   Engineering
-#define ACS_CMD_TRACKREAD      "TrackReplay"  // Read tracking info      Inbound   Engineering
-#define ACS_CMD_TRACKRADEC     "TrackRADec"   // Tracking to RA/DEC      Inbound
-                               
-#define ACS_CMD_AGCORR         "AGCorr"       // Autoguider correction   Inbound
-
-#define ACS_CMD_AGDATUM        "AGDatum"      // Autoguider datum        Inbound
-                               
-#define ACS_CMD_METINFO        "MetInfo"      // Meteorology information Inbound
-                               
-#define ACS_CMD_INSTINFO       "InstInfo"     // Instrument information  Inbound
-                               
-#define ACS_CMD_AXISINFO       "AxisInfo"     // Axis information        Inbound
-#define ACS_CMD_AXISDEMAND     "AxisDemand"   // Axis demand             Outbound
-                               
-#define ACS_CMD_ACSGETPARAM    "ACSGetParam"  // Get parameter           Inbound
-#define ACS_CMD_ACSSETPRARM    "ACSSetParam"  // Set parameter           Inbound
-#define ACS_CMD_ACSLOG         "ACSLog"       // Set parameter           Inbound
-#define ACS_CMD_ACSREPLAY      "ACSReplay"    // Set parameter           Inbound
-#define ACS_CMD_ACSRECONFIG    "ACSReconfig"  // Re-read configuration   Inbound 
-#define ACS_CMD_ACSCHANGE      "ACSChange"    // State change            Outbound
-#define ACS_CMD_ACSREPLY       "ACSReply"     // Reply                   Outbound
+#define ACS_CMD_NODEID         "NODEID"       //  Pseudo command
+#define ACS_CMD_TRACKINIT      "TRACKINIT"    // Tracking initialise     Inbound
+#define ACS_CMD_TRACKCORR      "TRACKCORR"    // Tracking corrections    Inbound
+#define ACS_CMD_TRACKOFFSET    "TRACKOFFSET"  // Tracking offsets        Inbound
+#define ACS_CMD_TRACKENABLE    "TRACKENABLE"  // Tracking control        Inbound
+#define ACS_CMD_TRACKEND       "TRACKEND"     // Tracking end            Inbound
+#define ACS_CMD_TRACKWRITE     "TRACKLOG"     // Write tracking info     Inbound   Engineering
+#define ACS_CMD_TRACKREAD      "TRACKREPLAY"  // Read tracking info      Inbound   Engineering
+#define ACS_CMD_TRACKRADEC     "TRACKRADEC"   // Tracking to RA/DEC      Inbound
+#define ACS_CMD_AGCORR         "AGCORR"       // Autoguider correction   Inbound
+#define ACS_CMD_AGDATUM        "AGDATUM"      // Autoguider datum        Inbound
+#define ACS_CMD_METINFO        "METINFO"      // Meteorology information Inbound
+#define ACS_CMD_INSTINFO       "INSTINFO"     // Instrument information  Inbound
+#define ACS_CMD_AXISINFO       "AXISINFO"     // Axis information        Inbound
+#define ACS_CMD_AXISDEMAND     "AXISDEMAND"   // Axis demand             Outbound
+#define ACS_CMD_ACSGETPARAM    "ACSGETPARAM"  // Get parameter           Inbound
+#define ACS_CMD_ACSSETPRARM    "ACSSETPARAM"  // Set parameter           Inbound
+#define ACS_CMD_ACSLOG         "ACSLOG"       // Set parameter           Inbound
+#define ACS_CMD_ACSREPLAY      "ACSREPLAY"    // Set parameter           Inbound
+#define ACS_CMD_ACSRECONFIG    "ACSRECONFIG"  // Re-read configuration   Inbound 
+#define ACS_CMD_ACSCHANGE      "ACSCHANGE"    // State change            Outbound
+#define ACS_CMD_ACSREPLY       "ACSREPLY"     // Reply                   Outbound
 
 // List of all recognised tags (organised by function 
-#define ACS_TAG_COMMANDNAME    "CommandName"  // Compulsory. Must be first tag
-
-#define ACS_TAG_DEMANDAZM      "DemandAzm"
-#define ACS_TAG_DEMANDZD       "DemandZD"
-#define ACS_TAG_DEMANDROT      "DemandRotAngle"
-#define ACS_TAG_DEMANDADDRPORT "DemandIP"
-
-#define ACS_TAG_TRACKEQUINOX   "TrackEquinox"
-#define ACS_TAG_TRACKEPOCH     "TrackEpoch"
-#define ACS_TAG_TRACKRA        "TrackRA"
-#define ACS_TAG_TRACKDEC       "TrackDec"
-#define ACS_TAG_TRACKPMRA      "TrackPMRA"
-#define ACS_TAG_TRACKPMDEC     "TrackPMDec"
-#define ACS_TAG_TRACKPARALLAX  "TrackParallax"
-#define ACS_TAG_TRACKRADVEL    "TrackRadVel"
-#define ACS_TAG_TRACKROTFRAME  "TrackRotFrame"
-#define ACS_TAG_TRACKROTANGLE  "TrackRotAngle"
-#define ACS_TAG_TRACKFREQ      "TrackFreq"
-#define ACS_TAG_TRACKSTART     "TrackStart"
-#define ACS_TAG_TRACKDURATION  "TrackDuration"
-
-#define ACS_TAG_ENABLEAG       "EnableAG"
-#define ACS_TAG_ENABLEMET      "EnableMet"
-#define ACS_TAG_ENABLECORR     "EnableCorr"
-#define ACS_TAG_ENABLEOFFSET   "EnableOffset"
-#define ACS_TAG_ENABLEPMRA     "EnablePMRA"
-#define ACS_TAG_ENABLEPMDEC    "EnablePMDec"
-#define ACS_TAG_ENABLEZD       "EnableZD"
-#define ACS_TAG_ENABLEAZM      "EnableAzm"
-#define ACS_TAG_ENABLEROT      "EnableRot"
-
-#define ACS_TAG_CORRTYPE       "CorrType"
-#define ACS_TAG_CORRFRAME      "CorrFrame"
-#define ACS_TAG_CORRX          "CorrX"
-#define ACS_TAG_CORRY          "CorrY"
-#define ACS_TAG_CORRROTANGLE   "CorrRotAngle"
-
-#define ACS_TAG_OFFSETTYPE     "OffsetType"
-#define ACS_TAG_OFFSETFRAME    "OffsetFrame"
-#define ACS_TAG_OFFSETX        "OffsetX"
-#define ACS_TAG_OFFSETY        "OffsetY"
-#define ACS_TAG_OFFSETROTANGLE "OffsetRotAngle"
-
-#define ACS_TAG_AGTYPE         "AGType"
-#define ACS_TAG_AGFRAME        "AGFrame"
+#define ACS_TAG_COMMANDNAME    "COMMANDNAME"  // Compulsory. Must be first tag
+#define ACS_TAG_DEMANDAZM      "DEMANDAZM"
+#define ACS_TAG_DEMANDZD       "DEMANDZD"
+#define ACS_TAG_DEMANDROT      "DEMANDROTANGLE"
+#define ACS_TAG_DEMANDADDRPORT "DEMANDIP"
+#define ACS_TAG_TRACKEQUINOX   "TRACKEQUINOX"
+#define ACS_TAG_TRACKEPOCH     "TRACKEPOCH"
+#define ACS_TAG_TRACKRA        "TRACKRA"
+#define ACS_TAG_TRACKDEC       "TRACKDEC"
+#define ACS_TAG_TRACKPMRA      "TRACKPMRA"
+#define ACS_TAG_TRACKPMDEC     "TRACKPMDEC"
+#define ACS_TAG_TRACKPARALLAX  "TRACKPARALLAX"
+#define ACS_TAG_TRACKRADVEL    "TRACKRADVEL"
+#define ACS_TAG_TRACKROTFRAME  "TRACKROTFRAME"
+#define ACS_TAG_TRACKROTANGLE  "TRACKROTANGLE"
+#define ACS_TAG_TRACKFREQ      "TRACKFREQ"
+#define ACS_TAG_TRACKSTART     "TRACKSTART"
+#define ACS_TAG_TRACKDURATION  "TRACKDURATION"
+#define ACS_TAG_ENABLEAG       "ENABLEAG"
+#define ACS_TAG_ENABLEMET      "ENABLEMET"
+#define ACS_TAG_ENABLECORR     "ENABLECORR"
+#define ACS_TAG_ENABLEOFFSET   "ENABLEOFFSET"
+#define ACS_TAG_ENABLEPMRA     "ENABLEPMRA"
+#define ACS_TAG_ENABLEPMDEC    "ENABLEPMDEC"
+#define ACS_TAG_ENABLEZD       "ENABLEZD"
+#define ACS_TAG_ENABLEAZM      "ENABLEAZM"
+#define ACS_TAG_ENABLEROT      "ENABLEROT"
+#define ACS_TAG_CORRTYPE       "CORRTYPE"
+#define ACS_TAG_CORRFRAME      "CORRFRAME"
+#define ACS_TAG_CORRX          "CORRX"
+#define ACS_TAG_CORRY          "CORRY"
+#define ACS_TAG_CORRROTANGLE   "CORRROTANGLE"
+#define ACS_TAG_OFFSETTYPE     "OFFSETTYPE"
+#define ACS_TAG_OFFSETFRAME    "OFFSETFRAME"
+#define ACS_TAG_OFFSETX        "OFFSETX"
+#define ACS_TAG_OFFSETY        "OFFSETY"
+#define ACS_TAG_OFFSETROTANGLE "OFFSETROTANGLE"
+#define ACS_TAG_AGTYPE         "AGTYPE"
+#define ACS_TAG_AGFRAME        "AGFRAME"
 #define ACS_TAG_AGX            "AGX"
 #define ACS_TAG_AGY            "AGY"
-#define ACS_TAG_AGROTANGLE     "AGRotAngle"
-#define ACS_TAG_AGROTATES      "AGRotates"
-#define ACS_TAG_AGWAVELENGTH   "AGWavelength"
-
-#define ACS_TAG_METTEMP        "MetTemp"
-#define ACS_TAG_METPRESS       "MetPress"
-#define ACS_TAG_METRH          "MetRH"
-
-#define ACS_TAG_INSTNAME       "InstName"
-#define ACS_TAG_INSTROTANGEL   "InstRotAngle"
-#define ACS_TAG_INSTROTATES    "InstRotates"
-#define ACS_TAG_INSTWAVELENGTH "InstWavelength"
-
-#define ACS_TAG_AXISSTATE      "AxisState"
-#define ACS_TAG_AXISZD         "AxisZD"
-#define ACS_TAG_AXISAZM        "AxisAzm"
-#define ACS_TAG_AXISROTANGLE   "AxisRotAngle"
-
-#define ACS_TAG_LOGFILE        "LogFile"
-#define ACS_TAG_LOGADDRPORT    "LogIP"
-#define ACS_TAG_LOGFREQ        "LogFreq"
-#define ACS_TAG_LOGACTION      "LogAction"
-
-#define ACS_TAG_ACSNEWSTATE    "ACSNewState"
-#define ACS_TAG_ACSREASON      "ACSReason"
-
-#define ACS_TAG_ParamName      "ParamName"
+#define ACS_TAG_AGROTANGLE     "AGROTANGLE"
+#define ACS_TAG_AGROTATES      "AGROTATES"
+#define ACS_TAG_AGWAVELENGTH   "AGWAVELENGTH"
+#define ACS_TAG_METTEMP        "METTEMP"
+#define ACS_TAG_METPRESS       "METPRESS"
+#define ACS_TAG_METRH          "METRH"
+#define ACS_TAG_INSTNAME       "INSTNAME"
+#define ACS_TAG_INSTROTANGEL   "INSTROTANGLE"
+#define ACS_TAG_INSTROTATES    "INSTROTATES"
+#define ACS_TAG_INSTWAVELENGTH "INSTWAVELENGTH"
+#define ACS_TAG_AXISSTATE      "AXISSTATE"
+#define ACS_TAG_AXISZD         "AXISZD"
+#define ACS_TAG_AXISAZM        "AXISAZM"
+#define ACS_TAG_AXISROTANGLE   "AXISROTANGLE"
+#define ACS_TAG_LOGFILE        "LOGFILE"
+#define ACS_TAG_LOGADDRPORT    "LOGIP"
+#define ACS_TAG_LOGFREQ        "LOGFREQ"
+#define ACS_TAG_LOGACTION      "LOGACTION"
+#define ACS_TAG_ACSNEWSTATE    "ACSNEWSTATE"
+#define ACS_TAG_ACSREASON      "ACSREASON"
+#define ACS_TAG_ParamName      "PARAMNAME"
+#define ACS_TAG_NODEID         "NODEID"
+#define ACS_TAG_NODEIP         "IPADDRESSPORT"
+#define ACS_TAG_COMMANDSTR     "COMMANDSTR"
+#define ACS_TAG_DATAFIELDSTR   "DATAFIELDSTR"
+#define ACS_TAG_TIMESTAMP      "TIMESTAMP"
 
 
 // Valid parameter names and associated values 
 // Parameters are parsed and converted to numerical value for use in code
-#define ACS_EMPTY_TXT            ""
-#define ACS_ENUM_NOT_FOUND       0
+#define ACS_EMPTY_TXT           ""
+#define ACS_ENUM_NOT_FOUND      0
 
-#define ACS_FRAME_CELEST_TXT     "CELESTIAL"
-#define ACS_FRAME_MOUNT_TXT      "MOUNT"
-#define ACS_FRAME_INST_TXT       "INSTRUMENT"
-#define ACS_FRAME_CELEST         1 
-#define ACS_FRAME_MOUNT          2 
-#define ACS_FRAME_INST           3 
-
-#define ACS_ROTFRAME_CELEST_TXT  "CELESTIAL"
-#define ACS_ROTFRAME_MOUNT_TXT   "MOUNT"
-#define ACS_ROTFRAME_PARAL_TXT   "PARALLACTIC"
-#define ACS_ROTFRAME_CELEST      1 
-#define ACS_ROTFRAME_MOUNT       2 
-#define ACS_ROTFRAME_PARAL       3 
-
-#define ACS_AG_STAR_TXT          "STAR"
-#define ACS_AG_WCS_TXT           "WCS"
-#define ACS_AG_STAR              1 
-#define ACS_AG_WCS               2 
-
-#define ACS_STATE_IDLE_TXT       "IDLE"
-#define ACS_STATE_SLEW_TXT       "SLEW"
-#define ACS_STATE_TRACK_TXT      "TRACK"
-#define ACS_STATE_WARN_TXT       "WARN"
-#define ACS_STATE_ERROR_TXT      "ERROR"
-#define ACS_STATE_IDLE           0 
-#define ACS_STATE_SLEW           1
-#define ACS_STATE_TRACK          2
-#define ACS_STATE_WARN           3
-#define ACS_STATE_ERROR          4
-
-#define ACS_TYPE_FIXED_TXT   "FIXED"
-#define ACS_TYPE_CUMUL_TXT   "CUMULATIVE"
-#define ACS_TYPE_NONE        0  
-#define ACS_TYPE_FIXED       1  
-#define ACS_TYPE_CUMUL       2 
+#define ACS_FRAME_CELEST_TXT    "CELESTIAL"
+#define ACS_FRAME_MOUNT_TXT     "MOUNT"
+#define ACS_FRAME_INST_TXT      "INSTRUMENT"
+#define ACS_FRAME_CELEST        1 
+#define ACS_FRAME_MOUNT         2 
+#define ACS_FRAME_INST          3 
+#define ACS_ROTFRAME_CELEST_TXT "CELESTIAL"
+#define ACS_ROTFRAME_MOUNT_TXT  "MOUNT"
+#define ACS_ROTFRAME_PARAL_TXT  "PARALLACTIC"
+#define ACS_ROTFRAME_CELEST     1 
+#define ACS_ROTFRAME_MOUNT      2 
+#define ACS_ROTFRAME_PARAL      3 
+#define ACS_AG_STAR_TXT         "STAR"
+#define ACS_AG_WCS_TXT          "WCS"
+#define ACS_AG_STAR             1 
+#define ACS_AG_WCS              2 
+#define ACS_STATE_IDLE_TXT      "IDLE"
+#define ACS_STATE_SLEW_TXT      "SLEW"
+#define ACS_STATE_TRACK_TXT     "TRACK"
+#define ACS_STATE_WARN_TXT      "WARN"
+#define ACS_STATE_ERROR_TXT     "ERROR"
+#define ACS_STATE_IDLE          0 
+#define ACS_STATE_SLEW          1
+#define ACS_STATE_TRACK         2
+#define ACS_STATE_WARN          3
+#define ACS_STATE_ERROR         4
+#define ACS_TYPE_FIXED_TXT      "FIXED"
+#define ACS_TYPE_CUMUL_TXT      "CUMULATIVE"
+#define ACS_TYPE_NONE           0  
+#define ACS_TYPE_FIXED          1  
+#define ACS_TYPE_CUMUL          2 
 
 //#define ACS_OFFSETTYPE_FIXED_TXT   "FIXED"
 //#define ACS_OFFSETTYPE_CUMUL_TXT   "CUMULATIVE"
 //#define ACS_OFFSETTYPE_FIXED       1  
 //#define ACS_OFFSETTYPE_CUMUL       2 
 
-#define ACS_LOGACTION_REPLAY_TXT    "REPLAY"
-#define ACS_LOGACTION_GOTO_TXT      "GOTO"
-#define ACS_LOGACTION_REPLAY        1 
-#define ACS_LOGACTION_GOTO          2  
+#define ACS_LOGACTION_REPLAY_TXT "REPLAY"
+#define ACS_LOGACTION_GOTO_TXT   "GOTO"
+#define ACS_LOGACTION_REPLAY     1 
+#define ACS_LOGACTION_GOTO       2  
 
 #define ACS_EQUINOX_B1950_0_TXT  "B1950.0"  
 #define ACS_EQUINOX_J2000_0_TXT  "J2000.0" 
@@ -242,43 +229,47 @@
 
 // Logging 
 #define ACS_LOG_FILE    "/tmp/acs_errlog.log"  // Default log file
-#define ACS_TSTAMP_FMT  "%FT%T"                // Timestamp format ISO 
-#define ACS_LOG_ERR     ACS_PFX_WRN_TXT"_"ACS_FAC_LOG_TXT": Failed to write to log file"
-#define ACS_SUB_ERR     ACS_PFX_ERR_TXT"_"ACS_FAC_ACS_TXT": Failed to spawn sub-process"
+//#define ACS_TSTAMP_FMT  "%FT%T"                // Timestamp format ISO 
+#define ACS_LOG_ERR     LOG_WRN_TXT"_"ACS_FAC_LOG_TXT": Failed to write to log file"
+#define ACS_SUB_ERR     LOG_ERR_TXT"_"ACS_FAC_ACS_TXT": Failed to spawn sub-process"
 
 // Severity prefix
-#define ACS_PFX_INF      0                 // Information
-#define ACS_PFX_WRN      1                 // Warning. Recoverable or ignorable
-#define ACS_PFX_ERR      2                 // Fatal error
-#define ACS_PFX_LIB      3                 // Fatal plibsys error 
-#define ACS_PFX_SYS      4                 // Fatal system error 
-#define ACS_PFX_DBG      5 
+#define LOG_INF      0                 // Information
+#define LOG_WRN      1                 // Warning. Recoverable
+#define LOG_ERR      2                 // Fatal error
+#define LOG_LIB      3                 // Fatal plibsys or sofa error 
+#define LOG_SYS      4                 // Fatal system error 
+#define LOG_DBG      5                 // Debug 
 
 // Severity prefix
-#define ACS_PFX_INF_TXT  "INF"             // Information
-#define ACS_PFX_WRN_TXT  "WRN"             // Warning. Recoverable or ignorable
-#define ACS_PFX_ERR_TXT  "ERR"             // Fatal error
-#define ACS_PFX_LIB_TXT  "LIB"             // Fatal plibsys error 
-#define ACS_PFX_SYS_TXT  "SYS"             // Fatal system error 
-#define ACS_PFX_DBG_TXT  "DBG"             // Debug 
+#define LOG_INF_TXT  "INF"             // Information
+#define LOG_WRN_TXT  "WRN"             // Warning. Recoverable or ignorable
+#define LOG_ERR_TXT  "ERR"             // Fatal error
+#define LOG_LIB_TXT  "LIB"             // Fatal plibsys error 
+#define LOG_SYS_TXT  "SYS"             // Fatal system error 
+#define LOG_DBG_TXT  "DBG"             // Debug 
 
 // Facility number 
 #define ACS_FAC_ACS      0 
-#define ACS_FAC_CFG      1 
-#define ACS_FAC_NET      2 
-#define ACS_FAC_LOG      3 
-#define ACS_FAC_MEM      4 
+#define ACS_FAC_AST      1 
+#define ACS_FAC_CHK      2 
+#define ACS_FAC_CMD      3 
+#define ACS_FAC_INI      4 
 #define ACS_FAC_JSN      5 
-#define ACS_FAC_CHK      6 
+#define ACS_FAC_LOG      6 
+#define ACS_FAC_NET      7 
+#define ACS_FAC_UTL      8 
 
 // Facility names
 #define ACS_FAC_ACS_TXT  "ACS"
-#define ACS_FAC_CFG_TXT  "CFG"
-#define ACS_FAC_NET_TXT  "NET"
-#define ACS_FAC_LOG_TXT  "LOG"
-#define ACS_FAC_MEM_TXT  "MEM"
-#define ACS_FAC_JSN_TXT  "JSN"
+#define ACS_FAC_AST_TXT  "AST"
 #define ACS_FAC_CHK_TXT  "CHK"
+#define ACS_FAC_CMD_TXT  "CMD"
+#define ACS_FAC_INI_TXT  "INI"
+#define ACS_FAC_JSN_TXT  "JSN"
+#define ACS_FAC_LOG_TXT  "LOG"
+#define ACS_FAC_NET_TXT  "NET"
+#define ACS_FAC_UTL_TXT  "UTL"
 
 #define ACS_NET_PACKET_MAX 65535
 
@@ -287,7 +278,6 @@ typedef struct acs_time_s {
     char      str[STR_MAX];
     double    utc[2];
     struct tm tim;
-
 } acs_time_t; 
 
 
@@ -381,7 +371,6 @@ typedef struct acs_mem_s {
     double DmdRA;
     double DmdDec;
     double DmdEO;
-
 } acs_mem_t;
 
 // IP address
@@ -405,27 +394,31 @@ typedef struct acs_net_s {
 } acs_net_t;
 
 typedef struct acs_hdr_s {
-    int32_t start;  // Unique marker = 25510027 
-    int64_t ID;     // Unique message ID generated by sender
-    int32_t total;  // Total number of blocks expected making up message 
-    int32_t seqn;   // The sequence number of this block (starting at 1)
-    int32_t len;    // Block length
-    char    ack;    //  
-    int32_t type;
-} acs_hdr_t;
+    int32_t start;     // Unique marker = 25510027 
+    int64_t ID;        // Unique message ID generated by sender
+    int32_t count;     // Total number of blocks expected making up message 
+    int32_t number;    // The sequence number of this block (starting at 1)
+    int32_t jsn_len;   // Length of JSON data
+    char    ack;       // ACK expected 0=No 1=Yes
+    int32_t type;      // 1=Get 2=Set 3=Subscribe 4=Callback 5=ACK 6=Error
+    long    timestamp; //
 
+}  __attribute__((packed)) acs_hdr_t;
+#define ACS_HDR_SIZEOF sizeof( acs_hdr_t )
 
+#define ACS_JSN_SIZEOF   ( ACS_NET_PACKET_MAX - ACS_HDR_SIZEOF )
 typedef struct acs_pkt_s {
     acs_hdr_t     hdr; 
-    unsigned char jsn[ACS_NET_PACKET_MAX - sizeof(acs_hdr_t)];
-} acs_pkt_t;
-
+    unsigned char jsn[ ACS_JSN_SIZEOF ];
+} __attribute__((packed)) acs_pkt_t;
+#define ACS_PKT_SIZEOF sizeof( acs_pkt_t )
 
 // Used when parsing or writing JSON packets
 #define JSN_TYP_END   0
 #define JSN_TYP_INT   1
 #define JSN_TYP_STR   2
 #define JSN_TYP_DBL   3
+#define JSN_TYP_LONG  4 
 #define JSN_FMT_INT   "\"%s\": %i,"
 #define JSN_FMT_DBL   "\"%s\": %f,"
 #define JSN_FMT_STR   "\"%s\": \"%s\","
@@ -435,21 +428,22 @@ typedef struct acs_pkt_s {
 #define JSN_FMT_MKDMD "\"%s\": %15.11f ,"
 #define JSN_FMT_WRDMD         "%15.11f"
 
-// ACS data types for tags found in JSON packet 
+// Data types for tags found in JSON packet 
 #define ACS_TYP_UNK          0 // Checks for uninitialised variable 
-#define ACS_TYP_INT          1 // integer stared as int
-#define ACS_TYP_DBL          2 // double stored as douoble
-#define ACS_TYP_STR          3 // string stored as string
+#define ACS_TYP_INT          1 // integer stored as int
+#define ACS_TYP_DBL          2 // double stored as double
+#define ACS_TYP_STR          3 // string stored as char[] 
 #define ACS_TYP_BOOL         4 // true/false converted stored as bool
 #define ACS_TYP_ENUM         5 // A string converted to pseudo enum    
 #define ACS_TYP_TIME         6 // A string converted to a time
-#define ACS_TYP_IP           7 // A string converted to a time
+#define ACS_TYP_IP           7 // A string converted to IP address:port 
+#define ACS_TYP_LONG         8 // integer stored as long
 
-// Array data are not handled (yet) but are inlcuded for completeness 
-#define ACS_TYP_ARRAY_INT    8 
-#define ACS_TYP_ARRAY_STR    9 
-#define ACS_TYP_ARRAY_DBL    10 
-#define ACS_TYP_ARRAY_BOOL   11 
+// Array data are not handled (yet)  
+//#define ACS_TYP_ARRAY_INT     
+//#define ACS_TYP_ARRAY_STR     
+//#define ACS_TYP_ARRAY_DBL     
+//#define ACS_TYP_ARRAY_BOOL    
 
 
 // JSON tag item used to construct message array
@@ -459,6 +453,7 @@ typedef struct jsn_tag_s {
     char *fmt;   // Format when sprintf-ing output string
     void *val;   // Pointer to tag's value 
 } jsn_tag_t;
+
 
 // ACS Configuration Table 
 typedef struct acs_cfg_s {
@@ -480,6 +475,7 @@ typedef struct acs_cmd_s {
     int   dir;       // Command direction (inbound or outbound)
 } acs_cmd_t;
 
+
 // ACS Tag Table
 typedef struct acs_tag_s {
     char  *name; // Tag name
@@ -491,6 +487,7 @@ typedef struct acs_tag_s {
     void  *str;  // String check values   
 } acs_tag_t;
 
+
 // Conversion tables for string to pseudo-enum
 typedef struct acs_enum_s {
      unsigned char *str;
@@ -498,71 +495,83 @@ typedef struct acs_enum_s {
 } acs_enum_t;
 
 
-// Macro prototypes
-#define acs_debug( lvl, fmt, ...) acs_dbg_lvl >= lvl ? printf( "DBG: "fmt"\n", __VA_ARGS__):0
-
 // Global function prototypes
-int acs_close( void );
+int  acs_close( void );
 
-int              utl_val2enum( unsigned char *val, unsigned char *tbl[] );
-acs_func_t       utl_cmd2func( unsigned char *cmd );
-struct timespec *utl_dbl2ts( double dbl );
-struct timespec  utl_ts_add( struct timespec *t1, struct timespec *t2 );
-struct timespec  utl_ts_sub( struct timespec *t1, struct timespec *t2 );
-int              utl_ts_cmp( struct timespec *t1, struct timespec *t2 );
-int              utl_filexist( char *file );
+int   utl_val2enum( unsigned char *val, unsigned char *tbl[] );
+int   utl_filexist( char *file );
+int   utl_unspace ( char *str );
+int   utl_unslash ( char *str );
+int   utl_upcase  ( char *str );
+int   utl_subchar ( char *str, char old, char new );
+int   utl_unchar  ( char *str, char *chars );
+char *utl_ts2str  ( struct timespec *ts, char *str );
+char *utl_ts2adstr( struct timespec *ts, char *str );
+int   utl_ts_cmp( struct timespec *t1, struct timespec *t2 );
+long  utl_ts2ad ( struct timespec *ts );
+struct timespec utl_ad1tots( long ad1 );
+struct timespec utl_dbl2ts( double dbl );
+struct timespec utl_ts_add( struct timespec *t1, struct timespec *t2 );
+struct timespec utl_ts_sub( struct timespec *t1, struct timespec *t2 );
 
-int acs_ini_mkmem( void );
-int acs_ini_mkmem2( void );
-int acs_ini_read ( void );
-int acs_ini_data ( void );
-int acs_ast_calc ( struct timespec *ts );
+int  ini_mkmem( void );
+int  ini_read ( void );
+int  ini_data ( void );
+int  acs_ast_calc( struct timespec *ts );
 
-int acs_log_msg( int ret, int pfx, int fac, char *fmt, ... );
+int  log_msg( int ret, int pfx, int fac, char *fmt, ... );
+void log_dmp_pkt( acs_pkt_t *pkt ); 
 
-int      acs_net_cmd_ini( acs_net_t *net );
-int      acs_net_dmd_ini( acs_net_t *net );
-void     acs_net_free( acs_net_t *net );
-long int acs_net_cmd_rcv( acs_net_t *net, unsigned char *buf, long int siz );
-long int acs_net_cmd_snd( acs_net_t *net, unsigned char *buf, long int len );
-long int acs_net_dmd_rcv( acs_net_t *net, unsigned char *buf, long int siz );
-long int acs_net_dmd_snd( acs_net_t *net, unsigned char *buf, long int len );
-int      acs_net_chk( char *AddrPort, char *Addr, int *Port  );
+void net_free( acs_net_t *net );
+int  net_cmd_ini( acs_net_t *net );
+int  net_dmd_ini( acs_net_t *net );
+acs_pkt_t *net_cmd_rcv( acs_net_t *net);
+long net_dmd_rcv( acs_net_t *net, acs_pkt_t *pkt, long pkt_len );
+long net_cmd_snd( acs_net_t *net, acs_pkt_t *pkt, long pkt_len );
+long net_dmd_snd( acs_net_t *net, acs_pkt_t *pkt, long pkt_len );
+long net_ack_snd( acs_net_t *net, acs_pkt_t *pkt, char *jsn );
+char*net_hdr_parse( acs_pkt_t *pkt );
+int  net_chk_addr( char *addrport, char *addr, int *port );
 
-int acs_chk_int ( unsigned char *str, int    *var, acs_tag_t *tag );
-int acs_chk_dbl ( unsigned char *str, double *var, acs_tag_t *tag );
-int acs_chk_str ( unsigned char *str, char   *var, acs_tag_t *tag );
-int acs_chk_bool( unsigned char *str, bool   *var, acs_tag_t *tag );
-int acs_chk_enum( unsigned char *str, int    *var, acs_tag_t *tag, acs_enum_t *tbl );
-int acs_chk_ip  ( unsigned char *str, char   *var, acs_tag_t *tag  );
-int acs_chk_time( unsigned char *str, acs_time_t *tim, acs_tag_t *tag );
+int  chk_bool( unsigned char *str, bool   *var, acs_tag_t *tag );
+int  chk_int ( unsigned char *str, int    *var, acs_tag_t *tag );
+int  chk_long( unsigned char *str, long   *var, acs_tag_t *tag );
+int  chk_dbl ( unsigned char *str, double *var, acs_tag_t *tag );
+int  chk_str ( unsigned char *str, char   *var, acs_tag_t *tag );
+int  chk_enum( unsigned char *str, int    *var, acs_tag_t *tag, acs_enum_t *tbl );
+int  chk_ip  ( unsigned char *str, char   *var, acs_tag_t *tag  );
+int  chk_time( unsigned char *str, acs_time_t *tim, acs_tag_t *tag );
 
-long int acs_jsn_mkpkt( acs_pkt_t  *pkt, unsigned char ack, int type, jsn_tag_t *tags );
-long int acs_jsn_mkdmd( acs_pkt_t **pkt );
-long int acs_jsn_wrdmd( acs_pkt_t  *pkt );
-bool     acs_jsn_parse( unsigned char *pkt );
-int      acs_tags_cmp( const void *ptr1, const void *ptr2 );
+long jsn_mkpkt( acs_pkt_t  *pkt, unsigned char ack, int type, jsn_tag_t *tags );
+long jsn_mkdmd( acs_pkt_t **pkt );
+long jsn_wrdmd( acs_pkt_t  *pkt );
+bool jsn_parse( unsigned char **pkt, char *expected );
+int  acs_tags_cmp( const void *ptr1, const void *ptr2 );
+
 
 // Function call for each command
-int acs_cmd_TrackInit  (void);
-int acs_cmd_TrackCorr  (void);
-int acs_cmd_TrackOffset(void);
-int acs_cmd_TrackEnable(void);
-int acs_cmd_TrackEnd   (void);
-int acs_cmd_TrackWrite (void);
-int acs_cmd_TrackRead  (void);
-int acs_cmd_TrackRADec (void);
-int acs_cmd_AGCorr     (void);
-int acs_cmd_AGDatum    (void);
-int acs_cmd_MetInfo    (void);
-int acs_cmd_InstInfo   (void);
-int acs_cmd_AxisInfo   (void);
-int acs_cmd_AxisDemand (void);
-int acs_cmd_ACSGetParam(void);
-int acs_cmd_ACSSetParam(void);
-int acs_cmd_ACSReconfig(void);
-int acs_cmd_ACSChange  (void);
-int acs_cmd_ACSReply   (void);
+int  cmd_Null       (void);
+int  cmd_TrackInit  (void);
+int  cmd_TrackCorr  (void);
+int  cmd_TrackOffset(void);
+int  cmd_TrackEnable(void);
+int  cmd_TrackEnd   (void);
+int  cmd_TrackWrite (void);
+int  cmd_TrackRead  (void);
+int  cmd_TrackRADec (void);
+int  cmd_AGCorr     (void);
+int  cmd_AGDatum    (void);
+int  cmd_MetInfo    (void);
+int  cmd_InstInfo   (void);
+int  cmd_AxisInfo   (void);
+int  cmd_AxisDemand (void);
+int  cmd_ACSGetParam(void);
+int  cmd_ACSSetParam(void);
+int  cmd_ACSReconfig(void);
+int  cmd_ACSChange  (void);
+int  cmd_ACSReply   (void);
+ 
+acs_func_t cmd_func( unsigned char *cmd );
 
 #include "acs_dat.h"
 #include "acs_tbl.h"

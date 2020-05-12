@@ -1,4 +1,9 @@
+/*!
+ * ACS JSON parser and functions 
+ */
+
 #include "acs.h"
+#define FAC ACS_FAC_JSN
 
 // Demand packet is stored locally
 static acs_pkt_t      dmd_pkt;                    // Demand packet 
@@ -6,13 +11,15 @@ static unsigned char *dmd_jsn_ptr = dmd_pkt.jsn;  // Pointer to start of JSON da
 static unsigned char *dmd_azm_ptr;                // Pointer to Azimuth field within JSON data
 static unsigned char *dmd_zd_ptr;                 // Pointer to Zenith Distance field within JSON data
 static unsigned char *dmd_rot_ptr;                // Pointer to Rotation field within JSON data
-static long int       dmd_len;                    // Total length of a demand packet (packet header + JSON data) 
+static long           dmd_len;                    // Total length of a demand packet (packet header + JSON data) 
+
 
 /*
 ** Parse a JSON packet
 */
-bool acs_jsn_parse( unsigned char *pkt )
+bool jsn_parse( unsigned char **blk, char *expected )
 {
+    unsigned char *blk_ptr;
     unsigned char *chr_ptr;
     unsigned char *quo_ptr; // Pointer to tage name quotation mark 
     unsigned char *sep_ptr; // Pointer to colon separator between tag:value 
@@ -22,126 +29,152 @@ bool acs_jsn_parse( unsigned char *pkt )
     unsigned char *val_ptr; // Data value
     unsigned char *cmd_ptr; // Command name
     unsigned char *end_ptr; // End of packet data
-    acs_func_t     func;    // Function associated with command
+    bool     cmd          ; // TRUE=Command block FALSE=Other block
+    acs_func_t     func = NULL;    // Function associated with command
 
     int            ok = false;
     acs_tag_t     *tag_ptr;
 
-    chr_ptr = pkt;
-    if ( !(end_ptr = strchr( pkt, '}' )))  
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Closing } missing from PKT=%s", pkt );
+//  Are we parsing the command block    
+    cmd = !strcmp( expected, ACS_TAG_COMMANDNAME );
+
+//  Copy pointer
+    chr_ptr = blk_ptr = *blk;
+
+    puts( chr_ptr );
+
+    if ( !(end_ptr = strchr( blk_ptr, '}' )))  
+        return log_msg( false, LOG_WRN, FAC, "Closing } missing from %s", blk_ptr );
     end_ptr--;
 
 // Search for first brace marking start of JSON and move past it 
-    if (( !(chr_ptr = strchr ( chr_ptr, '{'  )))||   // Find first brace { char marking start of JSON data
-        ( !(quo_ptr = strchr ( chr_ptr, '\"' )))||   // Find first \" char marking start of tag 
-        ( !(sep_ptr = strchr ( chr_ptr, ':'  )))||   // Find separator
-        ( !(brk_ptr = strpbrk( chr_ptr, ",}" )))  )  // Find break separating comma or terminating brace  
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "CommandName missing from PKT=%s", pkt );
+    if (( !(chr_ptr = strchr ( chr_ptr, '{' )))||  // Find brace { marking start of JSON
+        ( !(quo_ptr = strchr ( chr_ptr, '"' )))||  // Find '"' marking start of tag 
+        ( !(sep_ptr = strchr ( chr_ptr, ':' )))||  // Find separator
+        ( !(brk_ptr = strpbrk( chr_ptr, ",}")))  ) // Find break separating comma or terminating brace  
+        return log_msg( false, LOG_WRN, FAC, "Expected field %s missing from %s", expected, blk_ptr );
 
-//  Extract the tag name and check that it is "CommandName"
+//  Extract the tag name and check that it is as expected
     if ( !(nam_ptr = strtok( quo_ptr, " \"" )))
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "No tag found in PKT=%s", pkt);
-    if (strcmp( nam_ptr, ACS_TAG_COMMANDNAME ))
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Out-of-order TAG=%s. First tag must be CMD=%s", nam_ptr, ACS_TAG_COMMANDNAME);
+        return log_msg( false, LOG_WRN, FAC, "No tag found in PKT=%s", blk_ptr);
+    if (strcmp( nam_ptr, expected))
+        return log_msg( false, LOG_WRN, FAC, "Out-of-order. First tag must be '%s' not '%s'", expected, nam_ptr);
 
 //  Extract the associated value
     if ( !(cmd_ptr = strtok( ++sep_ptr, " \"}," )))
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "No command tag found in PKT=%s. No action", pkt);
-    acs_debug( DBG2, "RXCMD:%s=%s", nam_ptr, cmd_ptr );
+        return log_msg( false, LOG_WRN, FAC, "No command tag found in %s. No action", blk_ptr);
+    log_msg( false, LOG_DBG, FAC, "BLOCK:%s=%s", nam_ptr, cmd_ptr );
 
-    if ( !( func = utl_cmd2func( cmd_ptr )))
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised command=%s. No action", cmd_ptr );
+    if ( cmd && !( func = cmd_func( cmd_ptr )))
+        return log_msg( false, LOG_WRN, FAC, "Unrecognised command=%s. No action", cmd_ptr );
 
 //  Read any following tag name:value pairs
     while( brk_ptr < end_ptr )
     {
         chr_ptr = ++brk_ptr;
-        if  (( !(quo_ptr = strchr ( chr_ptr, '\"' )))||    // Find first \" char marking start of tag 
-             ( !(sep_ptr = strchr ( chr_ptr, ':'  )))||    // Find separator
-             ( !(brk_ptr = strpbrk( chr_ptr, ",}" )))  )   // Find break separating comma or terminating brace  
-            return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Command not found in JSON packet=%s", pkt );
+        if  (( !(quo_ptr = strchr ( chr_ptr, '"'  )))||  // Find '"' marking start of tag 
+             ( !(sep_ptr = strchr ( chr_ptr, ':'  )))||  // Find separator
+             ( !(brk_ptr = strpbrk( chr_ptr, ",}" )))  ) // Find break separating comma or terminating brace  
+            return log_msg( false, LOG_WRN, FAC, "Command not found in %s", blk_ptr );
 
-        if (!(nam_ptr = strtok(   quo_ptr, ", \"" )))      // If no tag then skip 
+        if (!(nam_ptr = strtok(   quo_ptr, ", \"" )))    // If no tag then skip 
             break;
-        if (!(val_ptr = strtok( ++sep_ptr, "}, \"")))      // If no value then skip 
+        if (!(val_ptr = strtok( ++sep_ptr, "}, \"")))    // If no value then skip 
             break;
-        acs_debug( DBG2, "  VAL:%s=%s", nam_ptr, val_ptr );// Useful to see what we got
-        
+        log_msg( false, LOG_DBG, FAC, "  VAL:%s=%s", nam_ptr, val_ptr );// Useful to see what we got
+    	if ( *val_ptr == '{' )
+        {
+	        *blk = val_ptr++;
+	        *val_ptr = '\"';
+            log_msg( false, LOG_DBG, FAC, "End of %s block", expected );  
+            return true;
+     }	
+
         // Search for the tag name in the look-up table 
         if ( !(tag_ptr = bsearch( &nam_ptr, acs_tags, acs_tags_num, acs_tags_siz, acs_tags_cmp )))
         { 
-            acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised TAG=%s. Ignoring", nam_ptr);
+            log_msg( false, LOG_WRN, FAC, "Unrecognised TAG=%s. Ignoring", nam_ptr);
             break;
         }
 
 //      How to process the value depends on its type
         switch ( tag_ptr->type )
         {
+            case ACS_TYP_BOOL:
+                ok = chk_bool( val_ptr, tag_ptr->var, tag_ptr );
+                break;
+
             case ACS_TYP_INT:
-                ok = acs_chk_int( val_ptr, tag_ptr->var, tag_ptr );
+                ok = chk_int( val_ptr, tag_ptr->var, tag_ptr );
+                break;
+
+            case ACS_TYP_LONG:
+                ok = chk_int( val_ptr, tag_ptr->var, tag_ptr );
                 break;
 
             case ACS_TYP_DBL:
-                ok = acs_chk_dbl( val_ptr, tag_ptr->var, tag_ptr );
+                ok = chk_dbl( val_ptr, tag_ptr->var, tag_ptr );
                 break;
 
             case ACS_TYP_STR:
-                ok = acs_chk_str( val_ptr, tag_ptr->var, tag_ptr );
+                ok = chk_str( val_ptr, tag_ptr->var, tag_ptr );
                 break;
 
             case ACS_TYP_ENUM:
                 ok = false;
 //              Determine which ENUM tag type and pass appropriate LUT 
                 if      (!strcmp( nam_ptr, ACS_TAG_TRACKEQUINOX  )  )
-                    ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_equinox );
+                    ok = chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_equinox );
                 else if (!strcmp( nam_ptr, ACS_TAG_TRACKROTFRAME )  )
-                    ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_rotframe );
+                    ok = chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_rotframe );
                 else if (!strcmp( nam_ptr, ACS_TAG_CORRFRAME     )||
                          !strcmp( nam_ptr, ACS_TAG_OFFSETFRAME   )||
                          !strcmp( nam_ptr, ACS_TAG_AGFRAME       )  )
-                    ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_frame );
+                    ok = chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_frame );
                 else if (!strcmp( nam_ptr, ACS_TAG_CORRTYPE      )||
                          !strcmp( nam_ptr, ACS_TAG_OFFSETTYPE    )  )
-                    ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_type );
+                    ok = chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_type );
                 else if (strcmp( nam_ptr, ACS_TAG_AGTYPE         )  )
-                    ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_ag );
+                    ok = chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_ag );
                 else if (strcmp( nam_ptr, ACS_TAG_LOGACTION      )  )
-                    ok = acs_chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_action );
+                    ok = chk_enum( val_ptr, tag_ptr->var, tag_ptr, acs_enum_action );
                 else
-                    ok = acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised TAG=%s. Ignoring", nam_ptr);
+                    ok = log_msg( false, LOG_WRN, FAC, "Unrecognised TAG=%s. Ignoring", nam_ptr);
                 break;
 
             case ACS_TYP_TIME:
-                ok = acs_chk_time( val_ptr, tag_ptr->var, tag_ptr );
+                ok = chk_time( val_ptr, tag_ptr->var, tag_ptr );
                 break;
 
             case ACS_TYP_IP:
-                ok = acs_chk_ip( val_ptr, tag_ptr->var, tag_ptr );
-                break;
-
-            case ACS_TYP_BOOL:
-                ok = acs_chk_bool( val_ptr, tag_ptr->var, tag_ptr );
+                ok = chk_ip( val_ptr, tag_ptr->var, tag_ptr );
                 break;
 
             default: // This should never happen :-)
-                ok = acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Unrecognised value TYPE=%i. Ignoring", tag_ptr->type);
+                ok = log_msg( false, LOG_WRN, FAC, "Unrecognised value TYPE=%i. Ignoring", tag_ptr->type);
                 break;
         }
     }
 
 //  Invoke the function for this command 
     if ( func )    
+    {
+       *blk = val_ptr + strlen(val_ptr)+2;
+      **blk = '{';
+        log_msg( false, LOG_DBG, FAC, "End of %s block", expected ); // 
         return func();
+    }
     else
-        return acs_log_msg( false, ACS_PFX_WRN, ACS_FAC_JSN, "Function not found for command");
+    {
+        return log_msg( false, LOG_WRN, FAC, "Function not found for command");
+    }
 }
 
 
 /*
- * Build a JSON packet from a supplied list of tag:values
+ * Build a JSON packet from a supplied list of tag:values pairs
  */
-long int acs_jsn_mkpkt( acs_pkt_t *pkt_ptr, unsigned char ack, int type, jsn_tag_t *tags )
+long jsn_mkpkt( acs_pkt_t *pkt_ptr, unsigned char ack, int type, jsn_tag_t *tags )
 {
     bool empty = true;
     bool busy  = true;
@@ -188,28 +221,28 @@ long int acs_jsn_mkpkt( acs_pkt_t *pkt_ptr, unsigned char ack, int type, jsn_tag
     strcat( jsn_ptr, "}]" );
 
 
-//  Polupulate header
-    pkt_ptr->hdr.start = ACS_PKT_START;     // Set packet start marker
+//  Populate header
+    pkt_ptr->hdr.start = ACS_STARTPACKAGE;  // Set packet start marker
     pkt_ptr->hdr.ID++;                      // Increment message ID
-    pkt_ptr->hdr.total = 1;                 // Total fragment count (always 1)
-    pkt_ptr->hdr.seqn  = 1;                 // This fragment's sequence No. (always 1)
-    pkt_ptr->hdr.len   = strlen( jsn_ptr ); // Length of JSON data
+    pkt_ptr->hdr.count = 1;                 // Total fragment count (always 1)
+    pkt_ptr->hdr.number= 1;                 // This fragment's sequence No. (always 1)
+    pkt_ptr->hdr.jsn_len = strlen( jsn_ptr ); // Length of JSON data
     pkt_ptr->hdr.ack   = ack;               // ACK needed, 0=no 1=yes
     pkt_ptr->hdr.type  = type;              // Command type
 
 //  Return total length including header
-    return ( sizeof(acs_hdr_t) +  pkt_ptr->hdr.len );
+    return ( sizeof(acs_hdr_t) +  pkt_ptr->hdr.jsn_len );
 }
 
 
 /*
  * Write axis values into demand packet template
  */
-long int acs_jsn_wrdmd( acs_pkt_t *pkt_ptr )
+long jsn_wrdmd( acs_pkt_t *pkt_ptr )
 {
-   long int off1;
-   long int off2;
-   long int off3;
+   long off1;
+   long off2;
+   long off3;
 
 //  Copy values into demand
     off1 = sprintf( dmd_azm_ptr, JSN_FMT_WRDMD, acs_mem->DmdAzm );
@@ -232,7 +265,7 @@ long int acs_jsn_wrdmd( acs_pkt_t *pkt_ptr )
  * Create a demand packet template
  * Subsequently only the demand values change 
  */
-long int acs_jsn_mkdmd( acs_pkt_t **pkt_ptr )
+long jsn_mkdmd( acs_pkt_t **pkt_ptr )
 {
 // Place holder values to locate fields
 #define DMD_AZM "-111.0"
@@ -277,7 +310,7 @@ long int acs_jsn_mkdmd( acs_pkt_t **pkt_ptr )
     tags[5].fmt ="";
 
 //  Create template packet and update locally held length 
-    dmd_len = acs_jsn_mkpkt( &dmd_pkt, 0, ACS_PKT_TYPE_CALLBACK, tags );  
+    dmd_len = jsn_mkpkt( &dmd_pkt, 0, ACS_HDR_TYPE_CALLBACK, tags );  
 
 //  Locate and save place holder addresses in local pointers
     dmd_azm_ptr = strstr( dmd_jsn_ptr, DMD_AZM );

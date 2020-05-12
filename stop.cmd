@@ -5,6 +5,6 @@
  "EnableOffset" : "true",
  "EnablePMRA" : "false" ,
  "EnablePMDec": "false",
- "EnableZD"   : "true",
- "EnableAzm"  : "true",
- "EnableRot"  : "true"}
+ "EnableZD"   : "false",
+ "EnableAzm"  : "false",
+ "EnableRot"  : "false"}

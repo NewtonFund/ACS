@@ -1,6 +1,6 @@
 {"CommandName": "TrackCorr",
-"CorrType": "FIXED", 
-"CorrFrame": "INSTRUMENT", 
-"CorrX": 1000.000, 
-"CorrY": 1000.000, 
-"CorrRotAngle": 1000.000} 
+"CorrType": "CUMULATIVE", 
+"CorrFrame": "MOUNT", 
+"CorrX": 10000.000, 
+"CorrY": 10000.000, 
+"CorrRotAngle": 10000.000} 

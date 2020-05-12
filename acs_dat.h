@@ -7,10 +7,11 @@
 
 
 // System global data declared as EXTERN for all other modules
-EXTERN int        acs_dbg_lvl             ;  // Debug level
+EXTERN int        acs_log_lvl             ;  // Debug level
 EXTERN pid_t      acs_cmdpid              ;  // Command process PID
 EXTERN pid_t      acs_dmdpid              ;  // nemand  process PID
-EXTERN acs_mem_t *acs_mem                 ;  // Share memory between processes
+EXTERN bool       acs_in_cmd              ;  // in command (not demand) 
+EXTERN acs_mem_t *acs_mem                 ;  // Shared memory between processes
 EXTERN acs_net_t  acs_net_dmd;            ; 
 EXTERN acs_net_t  acs_net_cmd;            ; 
 
@@ -23,6 +24,10 @@ EXTERN acs_net_t  acs_net_cmd;            ;
 **    2 - Incoming command message
 **    3 - Internal process updates/changes 
 */
+EXTERN int32_t acs_StartPackage           ;
+
+EXTERN long    acs_Timestamp              ;
+
 EXTERN char   str_Lat[STR_MAX]            ;
 EXTERN char   str_Lon[STR_MAX]            ;
 EXTERN double acs_Alt                     ;
@@ -32,7 +37,7 @@ EXTERN enum   PSocketProtocol_ acs_sktProtocol;
 EXTERN char   str_ACSAddrPort[STR_MAX]    ;
 EXTERN char   acs_Addr[STR_MAX]           ;
 EXTERN int    acs_Port                    ;
-                                          
+                                         
 EXTERN char   acs_Dir[DIR_MAX]            ;
 
 EXTERN double acs_LimitZDHi               ;
@@ -125,6 +130,7 @@ EXTERN bool   acs_EnablePMDec             ;
 EXTERN bool   acs_EnableZD                ;
 EXTERN bool   acs_EnableAzm               ;
 EXTERN bool   acs_EnableRot               ;
+EXTERN bool   acs_EnableModel             ;
 
 EXTERN char   str_CorrType[STR_MAX]       ;
 EXTERN int    acs_CorrType                ;
@@ -159,3 +165,9 @@ EXTERN int    acs_LogAction               ;
 EXTERN char   str_ACSNewState[STR_MAX]    ;
 EXTERN int    acs_ACSNewState             ;
 EXTERN char   acs_ACSReason[STR_MAX]      ;
+
+EXTERN int    acs_PktNodeID               ;
+EXTERN char   acs_PktNodeIP[STR_MAX]      ;
+EXTERN char   acs_PktCommandStr[STR_MAX]  ;
+EXTERN char   acs_PktDatafieldStr[STR_MAX];
+

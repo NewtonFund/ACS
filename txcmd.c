@@ -9,7 +9,8 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/wait.h>
-#include "plibsys.h"
+#include <plibsys.h>
+#include "acs.h"
 
 static PSocketAddress *addr = NULL;
 static PSocket        *conn = NULL; 
@@ -17,7 +18,7 @@ static PSocket        *conn = NULL;
 void net_ini( void )
 {
     if ( !addr )
-        addr = p_socket_address_new( "127.0.0.1", 14111 );
+        addr = p_socket_address_new( "127.0.0.1", 9001 );
 
     if ( conn )
        p_socket_free( conn );
@@ -43,6 +44,8 @@ int main( int argc, char *argv[] )
     long int tx_len=0;
     long int rx_len=0;
     int c;
+    
+    acs_pkt_t pkt;
 
     FILE *fp;
 
@@ -60,18 +63,33 @@ int main( int argc, char *argv[] )
         return EXIT_FAILURE;
     }
 
+    tx_len=sprintf( pkt.jsn, "{\"NODEID\":15,\"IPADDRESSPORT\":\"127.0.0.1:8081\",\"COMMANDSTR\":"); 
+
 //  Read in the test message
     while ( EOF != ( c = fgetc( fp ) ) )
     {
-       tx_buf[tx_len++] = c;
+       pkt.jsn[tx_len++] = c;
     }
-    tx_buf[--tx_len]='\0';
+    pkt.jsn[--tx_len]='}';
+    pkt.jsn[++tx_len]='\0';
+
+    pkt.hdr.start  = 25510027;
+    pkt.hdr.ID     = 1;
+    pkt.hdr.count  = 1;
+    pkt.hdr.number = 1;
+    pkt.hdr.jsn_len= tx_len;
+    pkt.hdr.ack    = 1;
+    pkt.hdr.type   = 2;
+    pkt.hdr.timestamp  = utl_ts2ad( TIME_NOW ) ;
+
+    tx_len += ACS_HDR_SIZEOF; 
+    printf("TXPKT: txlen=%li\n", tx_len );
 
     p_libsys_init();
     net_ini();
 
 //  Send the packet
-    if ( tx_len = p_socket_send( conn, tx_buf, tx_len , &error ) < 0 )
+    if ( tx_len = p_socket_send( conn, (unsigned char *)&pkt, tx_len , &error ) < 0 )
     { 
         printf("TXPKT: Fail txlen=%li\n", tx_len );
         return EXIT_FAILURE;

@@ -1,4 +1,6 @@
 #include "acs.h"
+#define FAC ACS_FAC_AST
+
 
 int acs_ast_calc(struct timespec *ts )
 {
@@ -32,7 +34,7 @@ int acs_ast_calc(struct timespec *ts )
     if (( acs_mem->EnableCorr                    )&& 
         ( acs_mem->CorrFrame == ACS_FRAME_CELEST )  ) 
     { 
-        acs_debug( DBG3, "CorrCelest %f %f", acs_mem->CorrX, acs_mem->CorrY );
+        log_msg( false, LOG_DBG, FAC, "CorrCelest %f %f", acs_mem->CorrX, acs_mem->CorrY );
         RA  += acs_mem->CorrX;
         Dec += acs_mem->CorrY;
     }
@@ -40,7 +42,7 @@ int acs_ast_calc(struct timespec *ts )
     if (( acs_mem->EnableOffset                    )&& 
         ( acs_mem->OffsetFrame == ACS_FRAME_CELEST )  ) 
     { 
-        acs_debug( DBG3, "OffsetCelest %f %f", acs_mem->OffsetX, acs_mem->OffsetY );
+        log_msg( false, LOG_DBG, FAC, "OffsetCelest %f %f", acs_mem->OffsetX, acs_mem->OffsetY );
         RA  += acs_mem->OffsetX;
         Dec += acs_mem->OffsetY;
     }
@@ -86,14 +88,14 @@ int acs_ast_calc(struct timespec *ts )
         { 
             if ( acs_mem->CorrFrame == ACS_FRAME_MOUNT ) 
             { 
-                acs_debug( DBG3, "CorrMount X=%f Y=%f", acs_mem->CorrX, acs_mem->CorrY );
+                log_msg( false, LOG_DBG, FAC, "CorrMount X=%f Y=%f", acs_mem->CorrX, acs_mem->CorrY );
                 DmdAzm += acs_mem->CorrX; 
                 DmdZD  += acs_mem->CorrY; 
                 DmdRot += acs_mem->CorrRot; 
             }
             else if ( acs_mem->CorrFrame == ACS_FRAME_INST ) 
             { 
-                acs_debug( DBG3, "CorrInst X=%f Y=%f", acs_mem->CorrX, acs_mem->CorrY );
+                log_msg( false, LOG_DBG, FAC, "CorrInst X=%f Y=%f", acs_mem->CorrX, acs_mem->CorrY );
 //              If instrument rotates with telescope then add current angle
                 if ( acs_mem->InstRotates )
                     InstRot = acs_mem->InstRotAngle + DmdRot;  
@@ -120,14 +122,14 @@ int acs_ast_calc(struct timespec *ts )
         { 
             if ( acs_mem->AGFrame == ACS_FRAME_MOUNT ) 
             { 
-                acs_debug( DBG3, "AGMount %f %f", acs_mem->AGX, acs_mem->AGY );
+                log_msg( false, LOG_DBG, FAC, "AGMount %f %f", acs_mem->AGX, acs_mem->AGY );
                 DmdAzm += acs_mem->AGX; 
                 DmdZD  += acs_mem->AGY; 
                 DmdRot += acs_mem->AGRotAngle; 
             }
             else if ( acs_mem->AGFrame == ACS_FRAME_INST ) 
             { 
-                acs_debug( DBG3, "AGInst %f %f", acs_mem->AGX, acs_mem->AGY );
+                log_msg( false, LOG_DBG, FAC, "AGInst %f %f", acs_mem->AGX, acs_mem->AGY );
 //              If instrument rotates with telescope then add current angle
                 if ( acs_mem->AGRotates )
                     InstRot = acs_mem->AGRotAngle + DmdRot;  
@@ -149,7 +151,6 @@ int acs_ast_calc(struct timespec *ts )
             }
         }
 
-
 //      Update all enabled axis demands otherwise they remain fixed
         if ( acs_mem->EnableAzm )
              acs_mem->DmdAzm = DmdAzm;
@@ -158,7 +159,7 @@ int acs_ast_calc(struct timespec *ts )
         if ( acs_mem->EnableRot )
              acs_mem->DmdRot = DmdRot * DR2D;
 
-        acs_debug( DBG3, "Demand: ZD=%.15f\t AZ=%.15f", DmdZD, DmdAzm );
+        log_msg( false, LOG_DBG, FAC, "Demand: ZD=%.15f\t AZ=%.15f", acs_mem->DmdZD, acs_mem->DmdAzm );
     }
 
     return ACS_SUCCESS;
