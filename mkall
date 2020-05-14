@@ -12,10 +12,9 @@ cd plibsys
 cmake -DCMAKE_BUILD_TYPE=Release ../plibsys-master
 make
 make install
-exitwq
+echo
 
-
-# Get, build and isntall SOFA library
+# Get, build and install SOFA library
 echo "Building SOFA library"
 cd ~/Downloads
 wget http://www.iausofa.org/2019_0722_C/sofa_c-20190722.tar.gz
@@ -24,7 +23,8 @@ cd sofa/20190722/c//src
 make 
 make test
 cp *.a /usr/lib
-cp *.h /usr/iunclude
+cp *.h /usr/include
+echo
 
 # Build the ACS
 echo "Building ACS.exe"
@@ -32,4 +32,3 @@ cd ~/ACS
 make
 
 echo "ACS.exe  build complete"
-wq
